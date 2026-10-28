@@ -1,0 +1,19 @@
+{
+  "name": "movecidade",
+  "private": true,
+  "version": "2.0.0",
+  "description": "MoveCidade — ônibus de Matão/SP: app do passageiro (PWA) + painel do gestor + simulador de telemetria.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "setup": "node scripts/setup.mjs",
+    "api": "node scripts/api.mjs",
+    "build": "npm --prefix frontend run build",
+    "start": "node scripts/setup.mjs && npm --prefix frontend run build && node scripts/api.mjs",
+    "test": "node scripts/api.mjs --pytest && npm --prefix frontend test",
+    "test:e2e": "npm --prefix frontend run e2e"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

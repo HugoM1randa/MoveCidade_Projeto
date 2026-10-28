@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<link rel="icon" href="/icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mapbox-gl@3.3.0/dist/mapbox-gl.css">
+<link rel="stylesheet" href="/vendor/leaflet.css">
+<title>MoveCidade - Gestor</title>
+<style>
+:root{
+  --bg:#0b1220;--painel:#131c2e;--card:#18233a;--linha:#2a3852;--txt:#f1f5f9;--sub:#a3b1c6;
+  --ok:#22c55e;--aviso:#f59e0b;--perigo:#ef4444;--info:#38bdf8;--cinza:#64748b;--raio:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,"Segoe UI",Roboto,sans-serif}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--txt);font-size:15px;line-height:1.4}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.oculto{display:none !important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+:focus-visible{outline:3px solid var(--info);outline-offset:2px}
+
+/* topo */
+.topo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 20px;background:var(--painel);border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:20}
+.marca{font-weight:800;font-size:1.05rem}
+.marca span{color:var(--info)}
+.pill{font-size:.78rem;font-weight:700;padding:5px 11px;border-radius:20px;background:#1e293b;color:var(--sub)}
+.pill.on{background:#052e16;color:#86efac}
+.pill.off{background:#450a0a;color:#fca5a5}
+.abas{margin-left:auto;display:flex;background:var(--bg);border:1px solid var(--linha);border-radius:12px;padding:3px;flex-wrap:wrap}
+.aba{background:none;border:0;color:var(--sub);padding:8px 16px;border-radius:9px;font-weight:700;font-size:.9rem;min-height:40px}
+.aba[aria-selected="true"]{background:var(--info);color:#04121f}
+.aba .n{display:inline-block;margin-left:6px;background:var(--perigo);color:#fff;border-radius:10px;padding:0 7px;font-size:.72rem}
+
+main{padding:18px 20px 40px;max-width:1280px;margin:0 auto}
+.tela{display:none}
+.tela.ativa{display:block}
+h1{font-size:1.4rem;margin-bottom:4px}
+h2{font-size:1.05rem;margin:0 0 10px}
+.sub{color:var(--sub);font-size:.88rem}
+.grade{display:grid;gap:14px}
+.k5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.dois{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
+@media (max-width:1000px){.k5{grid-template-columns:repeat(2,minmax(0,1fr))}.dois{grid-template-columns:1fr}}
+@media (max-width:560px){.k5{grid-template-columns:1fr}main{padding:14px 12px}}
+.caixa{background:var(--card);border:1px solid var(--linha);border-radius:var(--raio);padding:16px}
+
+/* KPIs */
+.kpi .rotulo{color:var(--sub);font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.kpi .valor{font-size:1.9rem;font-weight:900;margin:6px 0 2px}
+.kpi .det{color:var(--sub);font-size:.82rem}
+.kpi.bom .valor{color:#86efac}.kpi.alerta .valor{color:var(--aviso)}.kpi.ruim .valor{color:#fca5a5}
+.kpi .barra{height:6px;border-radius:4px;background:#1e293b;margin-top:8px;overflow:hidden}
+.kpi .barra i{display:block;height:100%;background:var(--info)}
+
+/* mapa */
+.mapa-caixa{height:420px;border-radius:var(--raio);overflow:hidden;border:1px solid var(--linha);position:relative}
+.mapa{width:100%;height:100%;background:#0f1a2e}
+.legenda{display:flex;gap:12px;flex-wrap:wrap;font-size:.8rem;color:var(--sub);margin-top:10px}
+.legenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.mc-veiculo{width:32px;height:32px;border-radius:50%;border:3px solid #0b1220;color:#04121f;font-weight:900;font-size:.7rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.mc-veiculo.pedido{box-shadow:0 0 0 4px var(--aviso)}
+.mc-veiculo-leaflet{background:none;border:0}
+.mc-pino{width:12px;height:12px;border-radius:50%;background:#0b1220;border:2px solid #f1f5f9}
+
+/* alertas e avisos */
+.alerta{border:1px solid var(--linha);border-left:5px solid var(--cinza);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--bg)}
+.alerta.CRITICO{border-left-color:var(--perigo)}
+.alerta.ATENCAO{border-left-color:var(--aviso)}
+.alerta.INFO{border-left-color:var(--info)}
+.alerta .tit{font-weight:800;font-size:1rem}
+.alerta .det{color:var(--sub);margin:4px 0 8px;font-size:.9rem}
+.alerta .sug{font-size:.9rem;margin-bottom:10px}
+.alerta .tag{font-size:.7rem;font-weight:800;padding:2px 8px;border-radius:6px;margin-right:6px;background:#1e293b;color:var(--sub)}
+.alerta.resolvido{opacity:.55}
+.acoes{display:flex;gap:8px;flex-wrap:wrap}
+.btn{background:var(--info);color:#04121f;border:0;border-radius:10px;padding:9px 16px;font-weight:800;min-height:40px}
+.btn.sec{background:var(--card);color:var(--txt);border:1px solid var(--linha)}
+.btn.ok{background:#16a34a;color:#fff}
+.btn.perigo{background:var(--perigo);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.pequeno{padding:6px 12px;min-height:34px;font-size:.85rem}
+.resumo{line-height:1.6}
+.resumo ul{margin:8px 0 0 18px;color:var(--sub)}
+.vazio{color:var(--sub);padding:12px 0}
+.aviso-ia{font-size:.8rem;color:var(--sub);margin-top:8px}
+
+/* tabelas */
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:11px 10px;border-bottom:1px solid var(--linha);vertical-align:middle}
+th{color:var(--sub);font-size:.78rem;text-transform:uppercase;letter-spacing:.4px}
+tr.sel{background:#1e3a5f}
+tr.clicavel{cursor:pointer}
+.st{font-size:.78rem;font-weight:800;padding:4px 10px;border-radius:20px;display:inline-block;white-space:nowrap}
+.st.operando{background:#052e16;color:#86efac}
+.st.atraso{background:#3b2a06;color:#fde68a}
+.st.semsinal{background:#1e293b;color:#cbd5e1}
+.st.critico{background:#450a0a;color:#fca5a5}
+.etq{font-size:.72rem;font-weight:700;padding:2px 7px;border-radius:6px;background:#1e293b;margin-right:4px}
+.etq.rampa{background:#0c3a4a;color:#bae6fd}
+.etq.piso{background:#3b2a06;color:#fde68a}
+.cor{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:middle}
+
+/* formularios */
+form.form{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
+form.form .largo{grid-column:1/-1}
+.campo{display:flex;flex-direction:column;gap:5px;font-size:.85rem;color:var(--sub);font-weight:700}
+.campo input,.campo select,.campo textarea{background:var(--bg);border:1px solid var(--linha);border-radius:9px;padding:9px 11px;color:var(--txt);font-size:.95rem;min-height:40px}
+.campo textarea{min-height:96px;resize:vertical}
+.marcas{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.marcas label{display:flex;gap:8px;align-items:center;color:var(--txt);font-weight:600}
+.marcas input{width:18px;height:18px;accent-color:var(--info)}
+.msg{font-size:.9rem;margin-top:8px}
+.msg.ok{color:#86efac}.msg.erro{color:#fca5a5}
+
+/* log */
+.log{font-size:.88rem;color:var(--sub);max-height:260px;overflow:auto}
+.log div{padding:6px 0;border-bottom:1px solid var(--linha)}
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <div class="marca">Move<span>Cidade</span> · Gestor</div>
+  <span class="pill" id="pill-ativos">carregando</span>
+  <span class="pill" id="pill-conexao" role="status" aria-live="polite">conectando</span>
+  <nav class="abas" role="tablist" aria-label="Seções do gestor">
+    <button class="aba" role="tab" data-tela="painel" aria-selected="true">Painel</button>
+    <button class="aba" role="tab" data-tela="alertas" aria-selected="false">Alertas <span class="n oculto" id="n-alertas">0</span></button>
+    <button class="aba" role="tab" data-tela="linhas" aria-selected="false">Linhas</button>
+    <button class="aba" role="tab" data-tela="pontos" aria-selected="false">Pontos</button>
+  </nav>
+</header>
+
+<main>
+  <!-- 2a: painel operacional -->
+  <section class="tela ativa" id="tela-painel" aria-label="Painel operacional">
+    <h1>Painel operacional</h1>
+    <p class="sub" style="margin-bottom:14px">Indicadores, frota e avisos da IA. Toda sugestão exige o aceite do gestor.</p>
+    <div class="grade k5" id="kpis"></div>
+    <div class="grade dois" style="margin-top:14px">
+      <div class="caixa">
+        <h2>Mapa da frota</h2>
+        <div class="mapa-caixa"><div class="mapa" id="mapa-frota"></div></div>
+        <div class="legenda">
+          <span><i style="background:var(--ok)"></i>operando</span>
+          <span><i style="background:var(--aviso)"></i>atraso</span>
+          <span><i style="background:var(--perigo)"></i>crítico / pedido de rampa</span>
+          <span><i style="background:var(--cinza)"></i>sem sinal</span>
+        </div>
+      </div>
+      <div class="caixa">
+        <h2>Hermes · avisos</h2>
+        <div id="avisos-painel"></div>
+        <p class="aviso-ia">Sugestões automáticas. Nenhuma ação é aplicada sem aceite do gestor.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2c: alertas e resumo do turno -->
+  <section class="tela" id="tela-alertas" aria-label="Alertas da IA">
+    <h1>Alertas da IA e resumo do turno</h1>
+    <p class="sub" style="margin-bottom:14px">Anomalias detectadas pelo Kharon e pedidos de rampa dos passageiros. Você decide.</p>
+    <div class="grade dois">
+      <div class="caixa">
+        <h2>Pendentes e decisões</h2>
+        <div id="lista-alertas"></div>
+      </div>
+      <div>
+        <div class="caixa" style="margin-bottom:14px">
+          <h2>Resumo do turno · gerado por Hermes</h2>
+          <div class="resumo" id="resumo-turno"></div>
+        </div>
+        <div class="caixa">
+          <h2>Histórico de decisões</h2>
+          <div class="log" id="log-decisoes"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2b: gestao de linhas -->
+  <section class="tela" id="tela-linhas" aria-label="Gestão de linhas">
+    <h1>Gestão de linhas</h1>
+    <p class="sub" style="margin-bottom:14px">Status calculado a partir da telemetria: operando, atraso ou sem sinal GPS.</p>
+    <div class="grade dois">
+      <div class="caixa">
+        <table>
+          <thead><tr><th>Linha</th><th>Trajeto</th><th>Pontos</th><th>Veículos</th><th>Status</th></tr></thead>
+          <tbody id="tab-linhas"></tbody>
+        </table>
+        <div class="acoes" style="margin-top:12px">
+          <button class="btn sec pequeno" id="btn-nova-linha">+ Nova linha</button>
+        </div>
+      </div>
+      <div class="caixa">
+        <h2 id="titulo-linha-sel">Selecione uma linha</h2>
+        <div class="mapa-caixa" style="height:300px"><div class="mapa" id="mapa-linha"></div></div>
+        <form class="form oculto" id="form-linha" style="margin-top:14px">
+          <label class="campo largo">Nome da linha
+            <input name="nome" required maxlength="60" placeholder="Ex.: 310 Vila Nova">
+          </label>
+          <label class="campo largo">Coordenadas do trajeto (uma por linha: latitude, longitude)
+            <textarea name="coordenadas" required placeholder="-21.6000,-48.3600&#10;-21.6050,-48.3550"></textarea>
+          </label>
+          <div class="acoes largo"><button class="btn" type="submit">Criar linha</button></div>
+          <p class="msg largo" id="msg-linha" role="status"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2d: gestao de pontos -->
+  <section class="tela" id="tela-pontos" aria-label="Gestão de pontos">
+    <h1>Gestão de pontos</h1>
+    <p class="sub" style="margin-bottom:14px">Acessibilidade dos pontos e cadastro de paradas. Mudanças valem para todas as linhas que passam por eles.</p>
+    <div class="grade dois">
+      <div class="caixa">
+        <table>
+          <thead><tr><th>Ponto</th><th>Referência</th><th>Linhas</th><th>Acessibilidade</th><th></th></tr></thead>
+          <tbody id="tab-pontos"></tbody>
+        </table>
+        <div class="acoes" style="margin-top:12px">
+          <button class="btn sec pequeno" id="btn-novo-ponto">+ Novo ponto</button>
+        </div>
+      </div>
+      <div class="caixa">
+        <h2 id="titulo-form-ponto">Novo ponto</h2>
+        <form class="form" id="form-ponto">
+          <input type="hidden" name="ponto_id">
+          <label class="campo largo">Nome do ponto
+            <input name="nome" required maxlength="80" placeholder="Ex.: Praça da Matriz">
+          </label>
+          <label class="campo">Latitude
+            <input name="latitude" type="number" step="0.00001" required min="-90" max="90">
+          </label>
+          <label class="campo">Longitude
+            <input name="longitude" type="number" step="0.00001" required min="-180" max="180">
+          </label>
+          <label class="campo largo" id="campo-linha-ponto">Linha
+            <select name="linha_id" id="sel-linha-ponto"></select>
+          </label>
+          <div class="marcas largo">
+            <label><input type="checkbox" name="rampa"> Rampa de acesso</label>
+            <label><input type="checkbox" name="piso_tatil"> Piso tátil</label>
+          </div>
+          <div class="acoes largo">
+            <button class="btn" type="submit">Salvar ponto</button>
+            <button class="btn sec" type="button" id="cancelar-ponto">Cancelar</button>
+            <button class="btn perigo oculto" type="button" id="remover-ponto">Remover ponto</button>
+          </div>
+          <p class="msg largo" id="msg-ponto" role="status"></p>
+        </form>
+        <div class="mapa-caixa" style="height:260px;margin-top:14px"><div class="mapa" id="mapa-ponto"></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mapbox-gl@3.3.0/dist/mapbox-gl.js"></script>
+<script src="/vendor/leaflet.js"></script>
+<script src="/vendor/mapa.js"></script>
+<script>
+(function () {
+  "use strict";
+  const MAPBOX_TOKEN = "__MAPBOX_TOKEN__";
+  const CENTRO = [-21.6033, -48.3652];
+  const ATRASO_S = 180;
+  const SEM_SINAL_S = 90;
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => MapaMC.escapar(t);
+  const pct = (v) => v == null ? "—" : Math.round(v * 100) + "%";
+
+  const E = {
+    telaAtual: "painel", veiculos: [], ativos: 0, linhas: [], pontos: [],
+    avisos: [], alertas: [], resumo: null, kpis: null, decisoes: [],
+    linhaSel: null, pontoEditando: null, mapaFrota: null, mapaLinha: null, mapaPonto: null,
+    ultimoOk: 0,
+  };
+
+  async function api(caminho, opcoes) {
+    const r = await fetch(caminho, Object.assign({ headers: { "Content-Type": "application/json" } }, opcoes || {}));
+    let dados = null;
+    try { dados = await r.json(); } catch (_) { /* sem corpo */ }
+    if (!r.ok) throw new Error((dados && dados.erro) || ("HTTP " + r.status));
+    return dados;
+  }
+
+  function ageS(instante) {
+    if (!instante) return Infinity;
+    return (Date.now() - Date.parse(instante)) / 1000;
+  }
+
+  // status de uma linha a partir da telemetria viva
+  function statusLinha(linha) {
+    const veic = E.veiculos.filter((v) => v.route_id === linha.id);
+    const vivos = veic.filter((v) => ageS(v.timestamp) <= SEM_SINAL_S);
+    if (!vivos.length) return { chave: "semsinal", texto: "sem sinal GPS", veic: veic.length };
+    if (vivos.some((v) => v.schedule_deviation_s > ATRASO_S)) return { chave: "atraso", texto: "atraso", veic: vivos.length };
+    return { chave: "operando", texto: "operando", veic: vivos.length };
+  }
+
+  function corVeiculo(v) {
+    const s = statusLinha({ id: v.route_id });
+    const pedido = v.accessibility_button;
+    if (pedido) return { cor: "#ef4444", pedido: true };
+    if (ageS(v.timestamp) > SEM_SINAL_S) return { cor: "#64748b", pedido: false };
+    if (v.schedule_deviation_s > ATRASO_S) return { cor: "#f59e0b", pedido: false };
+    return { cor: "#22c55e", pedido: false };
+  }
+
+  // ------------------------------------------------------------ carga
+  async function carregarTudo() {
+    const [estado, linhas, pontos, avisos, alertas, kpis, resumo, decisoes] = await Promise.all([
+      api("/api/telemetria/atual"), api("/api/linhas"), api("/api/pontos"),
+      api("/api/avisos"), api("/api/alertas"), api("/api/kpis"), api("/api/resumo"), api("/api/decisoes"),
+    ]);
+    E.veiculos = estado.veiculos || [];
+    E.ativos = estado.veiculos_ativos || 0;
+    E.linhas = linhas;
+    E.pontos = pontos.pontos || [];
+    E.avisos = avisos.avisos || avisos;
+    E.alertas = alertas.alertas || [];
+    E.kpis = kpis;
+    E.resumo = resumo;
+    E.decisoes = decisoes.decisoes || [];
+    E.ultimoOk = Date.now();
+  }
+
+  // ------------------------------------------------------------ painel
+  function renderKpis() {
+    const k = E.kpis || {};
+    const formatarSeg = (s) => {
+      if (s == null) return "—";
+      const min = Math.floor(s / 60), seg = Math.round(s % 60);
+      return min ? min + " min " + String(seg).padStart(2, "0") + " s" : seg + " s";
+    };
+    const cards = [
+      ["pontualidade", "Pontualidade"],
+      ["tempo_espera", "Tempo de espera"],
+      ["ocupacao_por_horario", "Ocupação por horário"],
+      ["duracao_viagem", "Duração da viagem"],
+      ["disponibilidade_frota", "Disponibilidade"],
+    ];
+    $("kpis").innerHTML = cards.map(([chave, rotulo]) => {
+      const item = k[chave] || {};
+      const v = item.valor;
+      let valor = "—", classe = "", barra = "";
+      if (chave === "pontualidade" && typeof v === "number") {
+        valor = pct(v);
+        classe = v >= 0.8 ? "bom" : v >= 0.6 ? "alerta" : "ruim";
+        barra = '<div class="barra"><i style="width:' + Math.round(v * 100) + '%"></i></div>';
+      } else if (chave === "disponibilidade_frota" && typeof v === "number") {
+        valor = pct(v);
+        classe = v >= 0.9 ? "bom" : "alerta";
+        barra = '<div class="barra"><i style="width:' + Math.round(v * 100) + '%"></i></div>';
+      } else if (chave === "tempo_espera" && typeof v === "number") {
+        valor = formatarSeg(v);
+      } else if (chave === "duracao_viagem" && typeof v === "number") {
+        valor = formatarSeg(v);
+      } else if (chave === "ocupacao_por_horario" && v && typeof v === "object") {
+        const pico = Object.entries(v).sort((a, b) => b[1] - a[1])[0];
+        if (pico) {
+          valor = pct(pico[1]);
+          classe = pico[1] > 0.7 ? "ruim" : pico[1] > 0.5 ? "alerta" : "bom";
+          item.detalhe = "pico às " + pico[0] + "h · " + (item.detalhe || "");
+        }
+      }
+      return '<div class="caixa kpi ' + classe + '"><div class="rotulo">' + esc(rotulo) + '</div>' +
+        '<div class="valor">' + esc(valor) + '</div>' +
+        '<div class="det">' + esc(item.detalhe || "") + '</div>' + barra + '</div>';
+    }).join("");
+    $("pill-ativos").textContent = "● " + E.ativos + " veículo(s) ativo(s)";
+    $("pill-ativos").className = "pill " + (E.ativos ? "on" : "off");
+  }
+
+  function avisosPendentes() {
+    return E.alertas.filter((a) => a.status === "pendente");
+  }
+
+  function renderAvisosPainel() {
+    const pend = avisosPendentes().slice(0, 4);
+    $("avisos-painel").innerHTML = pend.length
+      ? pend.map((a) => cardAlerta(a, true)).join("")
+      : '<p class="vazio">Nenhum aviso pendente. A operação segue sem alertas.</p>';
+    const n = avisosPendentes().length;
+    const badge = document.getElementById("n-alertas");
+    badge.textContent = n;
+    badge.classList.toggle("oculto", n === 0);
+  }
+
+  function renderMapaFrota() {
+    if (!E.mapaFrota) {
+      E.mapaFrota = MapaMC.criar("mapa-frota", { token: MAPBOX_TOKEN, centro: CENTRO, zoom: 14 });
+    }
+    const veiculos = E.veiculos.map((v) => {
+      const c = corVeiculo(v);
+      return { vehicle_id_publico: v.vehicle_id_publico, route_id: v.route_id, latitude: v.latitude,
+               longitude: v.longitude, cor: c.cor, solicitacao_ativa: c.pedido };
+    });
+    E.mapaFrota.desenharLinhas(E.linhas);
+    E.mapaFrota.desenharVeiculos(veiculos, null);
+  }
+
+  // ------------------------------------------------------------ alertas
+  function cardAlerta(a, compacto) {
+    const resolvido = a.status && a.status !== "pendente";
+    const tipoTxt = a.tipo === "RAMPA" ? "Pedido de rampa" : "Anomalia";
+    const acoes = resolvido
+      ? '<span class="sub">Decisão: <strong>' + esc(a.status) + '</strong></span>'
+      : '<div class="acoes"><button class="btn ok pequeno" data-decidir="aceitar" data-id="' + esc(a.id) + '">Aceitar</button>' +
+        '<button class="btn sec pequeno" data-decidir="ignorar" data-id="' + esc(a.id) + '">Ignorar</button></div>';
+    return '<div class="alerta ' + esc(a.severidade) + (resolvido ? " resolvido" : "") + '">' +
+      '<div class="tit"><span class="tag">' + esc(tipoTxt) + '</span>' + esc(a.titulo) + '</div>' +
+      '<div class="det">Veículo ' + esc(a.vehicle_id_publico) + ' · ' + esc(a.route_id) + ' · ' + esc(a.detalhe) + '</div>' +
+      (compacto ? "" : '<div class="sug">Sugestão: ' + esc(a.sugestao) + '</div>') +
+      acoes + '</div>';
+  }
+
+  function renderAlertas() {
+    const lista = E.alertas;
+    $("lista-alertas").innerHTML = lista.length
+      ? lista.map((a) => cardAlerta(a, false)).join("")
+      : '<p class="vazio">Nenhum alerta no momento.</p>';
+    const r = E.resumo || {};
+    $("resumo-turno").innerHTML = '<p>' + esc(r.texto || "Sem dados suficientes para o resumo.") + '</p>' +
+      (r.itens && r.itens.length ? '<ul>' + r.itens.map((i) => '<li>' + esc(i) + '</li>').join("") + '</ul>' : "");
+    $("log-decisoes").innerHTML = E.decisoes.length
+      ? E.decisoes.map((d) => '<div><strong>' + esc(d.instante) + '</strong> · ' + esc(d.titulo) +
+        ' (' + esc(d.vehicle_id_publico) + ') → <strong>' + esc(d.acao) + '</strong></div>').join("")
+      : '<p class="vazio">Nenhuma decisão registrada nesta sessão.</p>';
+  }
+
+  async function decidir(id, acao, botao) {
+    if (botao) botao.disabled = true;
+    try {
+      await api("/api/alertas/" + encodeURIComponent(id) + "/decisao", {
+        method: "POST", body: JSON.stringify({ acao }),
+      });
+      await carregarTudo();
+      renderTudo();
+    } catch (erro) {
+      alert("Não foi possível registrar a decisão: " + erro.message);
+      if (botao) botao.disabled = false;
+    }
+  }
+
+  // ------------------------------------------------------------ linhas
+  function renderLinhas() {
+    $("tab-linhas").innerHTML = E.linhas.map((l) => {
+      const s = statusLinha(l);
+      const sel = E.linhaSel === l.id ? " sel" : "";
+      return '<tr class="clicavel' + sel + '" data-linha="' + esc(l.id) + '">' +
+        '<td><span class="cor" style="background:' + esc(l.cor) + '"></span><strong>' + esc(l.nome) + '</strong></td>' +
+        '<td>' + esc(l.extensao_km) + ' km</td>' +
+        '<td>' + (l.paradas ? l.paradas.length : 0) + '</td>' +
+        '<td>' + s.veic + '</td>' +
+        '<td><span class="st ' + s.chave + '">' + esc(s.texto) + '</span></td></tr>';
+    }).join("") || '<tr><td colspan="5" class="vazio">Nenhuma linha cadastrada.</td></tr>';
+    renderMapaLinha();
+  }
+
+  function renderMapaLinha() {
+    if (!E.mapaLinha) E.mapaLinha = MapaMC.criar("mapa-linha", { token: MAPBOX_TOKEN, centro: CENTRO, zoom: 14 });
+    const linha = E.linhas.find((l) => l.id === E.linhaSel);
+    E.mapaLinha.desenharLinhas(linha ? [linha] : E.linhas);
+    E.mapaLinha.desenharPontos(linha ? linha.paradas : [], null);
+    $("titulo-linha-sel").textContent = linha ? linha.nome + " · trajeto" : "Todas as linhas";
+  }
+
+  async function criarLinha(ev) {
+    ev.preventDefault();
+    const f = ev.target;
+    const coordenadas = f.coordenadas.value.split(/\n+/).map((l) => l.trim()).filter(Boolean).map((l) => {
+      const [la, lo] = l.split(",").map((x) => parseFloat(x));
+      return [la, lo];
+    });
+    const msg = $("msg-linha");
+    try {
+      await api("/api/linhas", { method: "POST", body: JSON.stringify({ nome: f.nome.value.trim(), coordenadas }) });
+      msg.className = "msg ok"; msg.textContent = "Linha criada. Os pontos e horários foram gerados automaticamente.";
+      f.reset(); f.classList.add("oculto");
+      await carregarTudo(); renderTudo();
+    } catch (erro) {
+      msg.className = "msg erro"; msg.textContent = erro.message;
+    }
+  }
+
+  // ------------------------------------------------------------ pontos
+  function renderPontos() {
+    $("tab-pontos").innerHTML = E.pontos.map((p) => {
+      const linhas = E.linhas.filter((l) => l.paradas.some((x) => x.id === p.id)).map((l) => l.nome).join(", ") || "—";
+      const acess = (p.rampa ? '<span class="etq rampa">rampa</span>' : '<span class="etq">sem rampa</span>') +
+        (p.piso_tatil ? '<span class="etq piso">piso tátil</span>' : '');
+      return '<tr class="clicavel" data-ponto="' + esc(p.id) + '"><td><strong>' + esc(p.nome) + '</strong></td>' +
+        '<td class="sub">' + esc(p.latitude.toFixed(5)) + ', ' + esc(p.longitude.toFixed(5)) + '</td>' +
+        '<td>' + esc(linhas) + '</td><td>' + acess + '</td>' +
+        '<td><button class="btn sec pequeno" data-editar="' + esc(p.id) + '">Editar</button></td></tr>';
+    }).join("") || '<tr><td colspan="5" class="vazio">Nenhum ponto cadastrado.</td></tr>';
+
+    $("sel-linha-ponto").innerHTML = E.linhas.map((l) => '<option value="' + esc(l.id) + '">' + esc(l.nome) + '</option>').join("");
+    renderMapaPonto();
+  }
+
+  function renderMapaPonto() {
+    if (!E.mapaPonto) E.mapaPonto = MapaMC.criar("mapa-ponto", { token: MAPBOX_TOKEN, centro: CENTRO, zoom: 15 });
+    const p = E.pontos.find((x) => x.id === E.pontoEditando);
+    E.mapaPonto.desenharLinhas(E.linhas);
+    E.mapaPonto.desenharPontos(p ? [p] : [], p ? p.id : null);
+    if (p) E.mapaPonto.centralizar(p.latitude, p.longitude, 16);
+  }
+
+  function editarPonto(id) {
+    const p = E.pontos.find((x) => x.id === id);
+    if (!p) return;
+    E.pontoEditando = id;
+    const f = $("form-ponto");
+    f.ponto_id.value = p.id; f.nome.value = p.nome;
+    f.latitude.value = p.latitude; f.longitude.value = p.longitude;
+    f.rampa.checked = !!p.rampa; f.piso_tatil.checked = !!p.piso_tatil;
+    $("campo-linha-ponto").classList.add("oculto");
+    $("titulo-form-ponto").textContent = "Editar ponto · " + p.nome;
+    $("remover-ponto").classList.remove("oculto");
+    $("msg-ponto").textContent = "";
+    renderMapaPonto();
+  }
+
+  function novoPonto() {
+    E.pontoEditando = null;
+    const f = $("form-ponto");
+    f.reset(); f.ponto_id.value = "";
+    $("campo-linha-ponto").classList.remove("oculto");
+    $("titulo-form-ponto").textContent = "Novo ponto";
+    $("remover-ponto").classList.add("oculto");
+    $("msg-ponto").textContent = "";
+    renderMapaPonto();
+  }
+
+  async function salvarPonto(ev) {
+    ev.preventDefault();
+    const f = ev.target;
+    const corpo = {
+      nome: f.nome.value.trim(),
+      latitude: parseFloat(f.latitude.value),
+      longitude: parseFloat(f.longitude.value),
+      rampa: f.rampa.checked,
+      piso_tatil: f.piso_tatil.checked,
+    };
+    const msg = $("msg-ponto");
+    try {
+      if (f.ponto_id.value) {
+        await api("/api/pontos/" + encodeURIComponent(f.ponto_id.value), { method: "PUT", body: JSON.stringify(corpo) });
+        msg.textContent = "Ponto atualizado.";
+      } else {
+        corpo.linha_id = f.linha_id.value;
+        await api("/api/pontos", { method: "POST", body: JSON.stringify(corpo) });
+        msg.textContent = "Ponto criado e incluído na linha.";
+      }
+      msg.className = "msg ok";
+      await carregarTudo(); renderTudo();
+    } catch (erro) {
+      msg.className = "msg erro"; msg.textContent = erro.message;
+    }
+  }
+
+  async function removerPonto() {
+    const id = E.pontoEditando;
+    if (!id) return;
+    if (!confirm("Remover este ponto da linha? Os horários serão recalculados.")) return;
+    try {
+      await api("/api/pontos/" + encodeURIComponent(id), { method: "DELETE" });
+      novoPonto();
+      await carregarTudo(); renderTudo();
+    } catch (erro) {
+      $("msg-ponto").className = "msg erro"; $("msg-ponto").textContent = erro.message;
+    }
+  }
+
+  // ------------------------------------------------------------ navegacao e ciclo
+  function mostrar(tela) {
+    E.telaAtual = tela;
+    document.querySelectorAll(".tela").forEach((s) => s.classList.toggle("ativa", s.id === "tela-" + tela));
+    document.querySelectorAll(".aba").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tela === tela)));
+    renderTudo();
+    // mapas dentro de abas ocultas precisam recalcular o tamanho ao aparecer
+    [E.mapaFrota, E.mapaLinha, E.mapaPonto].forEach((m) => m && m.redimensionar());
+  }
+
+  function renderTudo() {
+    renderKpis();
+    renderAvisosPainel();
+    renderAlertas();
+    renderLinhas();
+    renderPontos();
+    if (E.telaAtual === "painel") renderMapaFrota();
+  }
+
+  function atualizarConexao() {
+    const ok = E.ultimoOk && Date.now() - E.ultimoOk < 10000;
+    $("pill-conexao").textContent = ok ? "● tempo real" : "sem conexão";
+    $("pill-conexao").className = "pill " + (ok ? "on" : "off");
+  }
+
+  let ocupado = false;
+  async function atualizar() {
+    if (ocupado) return;
+    ocupado = true;
+    try {
+      await carregarTudo();
+      renderTudo();
+    } catch (_) { /* mantém a última tela */ }
+    finally { ocupado = false; atualizarConexao(); }
+  }
+
+  // ------------------------------------------------------------ eventos
+  document.querySelectorAll(".aba").forEach((b) => b.addEventListener("click", () => mostrar(b.dataset.tela)));
+  document.addEventListener("click", (ev) => {
+    const d = ev.target.closest("[data-decidir]");
+    if (d) return decidir(d.dataset.id, d.dataset.decidir, d);
+    const e = ev.target.closest("[data-editar]");
+    if (e) return editarPonto(e.dataset.editar);
+    const pt = ev.target.closest("[data-ponto]");
+    if (pt && !ev.target.closest("button")) return editarPonto(pt.dataset.ponto);
+    const ln = ev.target.closest("[data-linha]");
+    if (ln) { E.linhaSel = ln.dataset.linha; renderLinhas(); $("form-linha").classList.add("oculto"); }
+  });
+  $("btn-nova-linha").addEventListener("click", () => {
+    E.linhaSel = null; renderMapaLinha(); renderLinhas();
+    const f = $("form-linha"); f.classList.remove("oculto"); f.reset(); $("msg-linha").textContent = "";
+  });
+  $("form-linha").addEventListener("submit", criarLinha);
+  $("btn-novo-ponto").addEventListener("click", novoPonto);
+  $("cancelar-ponto").addEventListener("click", novoPonto);
+  $("form-ponto").addEventListener("submit", salvarPonto);
+  $("remover-ponto").addEventListener("click", removerPonto);
+
+  // ------------------------------------------------------------ inicio
+  carregarTudo().then(() => { renderTudo(); renderMapaFrota(); atualizarConexao(); }).catch(atualizarConexao);
+  setInterval(atualizar, 3000);
+  setInterval(atualizarConexao, 2000);
+  try {
+    const fonte = new EventSource("/api/stream");
+    let t = null;
+    fonte.onmessage = () => { clearTimeout(t); t = setTimeout(atualizar, 300); };
+    fonte.onerror = () => { /* o polling cobre a atualizacao */ };
+  } catch (_) { /* sem SSE */ }
+})();
+</script>
+</body>
+</html>

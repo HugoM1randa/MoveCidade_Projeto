@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="description" content="MoveCidade - previsao de chegada dos onibus de Matao (simulacao)">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icone.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mapbox-gl@3.3.0/dist/mapbox-gl.css">
+<link rel="stylesheet" href="/vendor/leaflet.css">
+<title>MoveCidade - Passageiro</title>
+<style>
+:root{
+  --bg:#0b1220;--painel:#131c2e;--card:#18233a;--linha:#2a3852;--txt:#f1f5f9;--sub:#a3b1c6;
+  --ok:#22c55e;--aviso:#f59e0b;--perigo:#ef4444;--info:#38bdf8;--raio:14px;--alvo:44px;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui,"Segoe UI",Roboto,sans-serif}
+html,body{height:100%}
+body{background:var(--bg);color:var(--txt);font-size:16px;line-height:1.4;display:flex;flex-direction:column;min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;min-height:var(--alvo);min-width:var(--alvo)}
+.oculto{display:none !important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* topo */
+.topo{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--painel);border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:20}
+.voltar{background:none;border:0;color:var(--info);font-size:1.4rem;padding:0 8px;border-radius:10px}
+.titulo{font-weight:800;font-size:1.1rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.titulo small{display:block;font-weight:600;color:var(--sub);font-size:.8rem}
+.pill{font-size:.78rem;font-weight:700;padding:5px 11px;border-radius:20px;background:#1e293b;color:var(--sub);white-space:nowrap}
+.pill.on{background:#052e16;color:#86efac}
+.pill.off{background:#450a0a;color:#fca5a5}
+
+/* telas */
+main{flex:1;padding:16px 16px 96px;max-width:720px;width:100%;margin:0 auto}
+.tela{display:none}
+.tela.ativa{display:block}
+h1{font-size:1.5rem;line-height:1.2;margin:4px 0 14px}
+h2{font-size:1.1rem;margin:20px 0 10px}
+.nota{color:var(--sub);font-size:.9rem;margin-top:8px}
+
+/* busca */
+.busca{width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--linha);background:var(--card);font-size:1rem;min-height:var(--alvo)}
+.busca:focus{outline:3px solid var(--info);outline-offset:2px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.chip{border:1px solid var(--linha);background:var(--card);color:var(--sub);border-radius:20px;padding:8px 14px;font-weight:700;font-size:.9rem;min-height:var(--alvo)}
+.chip[aria-pressed="true"]{background:var(--info);color:#04121f;border-color:var(--info)}
+
+/* cartoes */
+.cartao{background:var(--card);border:1px solid var(--linha);border-radius:var(--raio);padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;align-items:center;width:100%;text-align:left;background-clip:padding-box}
+button.cartao{color:var(--txt)}
+.faixa{width:6px;align-self:stretch;border-radius:4px;flex-shrink:0}
+.cartao .corpo{flex:1;min-width:0}
+.cartao .nome{font-weight:800;font-size:1.02rem}
+.cartao .sub{color:var(--sub);font-size:.9rem;margin-top:2px}
+.eta{font-weight:800;font-size:1.5rem;text-align:right;white-space:nowrap}
+.eta small{display:block;font-size:.75rem;color:var(--sub);font-weight:700}
+.estado{font-size:.85rem;font-weight:700;display:inline-flex;gap:6px;align-items:center}
+.estado.vivo{color:#86efac}
+.estado.prog{color:var(--aviso)}
+.etiqueta{font-size:.75rem;font-weight:700;padding:3px 8px;border-radius:8px;background:#1e293b;color:var(--txt);margin-right:4px;display:inline-block}
+.etiqueta.acess{background:#052e16;color:#bbf7d0}
+.etiqueta.rampa{background:#0c3a4a;color:#bae6fd}
+.estrela{background:none;border:0;font-size:1.4rem;color:var(--aviso);padding:4px}
+.vazio{color:var(--sub);padding:14px 0}
+
+/* botoes */
+.btn{background:var(--info);color:#04121f;border:0;border-radius:12px;padding:12px 18px;font-weight:800;min-height:var(--alvo)}
+.btn.sec{background:var(--card);color:var(--txt);border:1px solid var(--linha)}
+.btn.perigo{background:var(--perigo);color:#fff}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn:focus-visible,.cartao:focus-visible,.chip:focus-visible,.voltar:focus-visible,.nav button:focus-visible{outline:3px solid var(--info);outline-offset:2px}
+.linha-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+
+/* destaque de previsao */
+.destaque{background:linear-gradient(135deg,#17315a,#18233a);border:1px solid #1e4a7a;border-radius:18px;padding:18px;margin-bottom:14px}
+.destaque .grande{font-size:2.6rem;font-weight:900;line-height:1}
+.destaque .grande span{font-size:1.1rem;font-weight:700;color:var(--sub)}
+.destaque .txt{color:var(--sub);margin-top:6px;font-size:.95rem}
+
+/* abas */
+.abas{display:flex;background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:4px;margin:12px 0}
+.abas button{flex:1;background:none;border:0;color:var(--sub);padding:8px;border-radius:9px;font-weight:700;min-height:var(--alvo)}
+.abas button[aria-selected="true"]{background:var(--info);color:#04121f}
+
+select.campo,.campo{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--linha);background:var(--card);min-height:var(--alvo)}
+
+/* interruptores */
+.interruptor{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--linha);min-height:var(--alvo)}
+.interruptor input{width:24px;height:24px;accent-color:var(--info)}
+
+/* mapa */
+.mapa-wrap{position:relative;height:calc(100vh - 230px);min-height:340px;border-radius:var(--raio);overflow:hidden;border:1px solid var(--linha)}
+.mapa{width:100%;height:100%;background:#0f1a2e}
+.mc-veiculo{width:34px;height:34px;border-radius:50%;border:3px solid #0b1220;color:#04121f;font-weight:900;font-size:.72rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:pointer}
+.mc-veiculo.pedido{box-shadow:0 0 0 4px #f59e0b}
+.mc-veiculo-leaflet{background:none;border:0}
+.mc-pino{width:14px;height:14px;border-radius:50%;background:#0b1220;border:2px solid #f1f5f9;cursor:pointer}
+.mc-pino.sel{background:var(--info);width:18px;height:18px}
+.legenda{position:absolute;left:10px;top:10px;background:rgba(19,28,46,.92);border:1px solid var(--linha);border-radius:10px;padding:6px 10px;font-size:.78rem;color:var(--sub);z-index:5}
+.folha{position:absolute;left:0;right:0;bottom:0;background:var(--painel);border-top:1px solid var(--linha);border-radius:18px 18px 0 0;padding:16px;z-index:6;box-shadow:0 -6px 20px rgba(0,0,0,.4)}
+.folha h3{font-size:1.05rem;margin-bottom:6px}
+.folha .fechar{position:absolute;right:8px;top:8px}
+
+/* historico */
+.linha-hist{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--linha);align-items:flex-start}
+.bolinha{width:12px;height:12px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.hist-tempo{margin-left:auto;font-weight:800;white-space:nowrap}
+.ok{color:#86efac}.atraso{color:var(--aviso)}
+
+/* navegacao inferior */
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--painel);border-top:1px solid var(--linha);display:flex;justify-content:space-around;padding:6px 6px calc(6px + env(safe-area-inset-bottom));z-index:30}
+.nav button{background:none;border:0;color:var(--sub);flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-weight:700;font-size:.8rem;padding:6px 4px;border-radius:12px}
+.nav button[aria-current="page"]{color:var(--info)}
+.nav .ico{font-size:1.3rem;line-height:1}
+.aviso-topo{background:#3b2a06;color:#fde68a;border:1px solid #78530b;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.92rem}
+.toast{position:fixed;left:16px;right:16px;bottom:82px;background:var(--card);border:1px solid var(--info);border-radius:12px;padding:12px 14px;z-index:40;font-weight:600}
+body.contraste{--bg:#000;--painel:#000;--card:#0a0a0a;--txt:#ffffff;--sub:#e5e7eb;--linha:#ffffff;--info:#7dd3fc}
+@media (min-width:900px){main{max-width:820px}.mapa-wrap{height:70vh}}
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <button class="voltar oculto" id="voltar" aria-label="Voltar">&#8592;</button>
+  <div class="titulo" id="titulo-topo">MoveCidade<small>Matao, SP · simulacao</small></div>
+  <span class="pill" id="status" role="status" aria-live="polite">conectando...</span>
+</header>
+
+<main>
+  <!-- 1a / 1b: inicio e busca -->
+  <section class="tela ativa" id="tela-inicio" aria-label="Inicio">
+    <h1>Para onde você vai em Matão?</h1>
+    <label class="sr" for="busca">Buscar linha ou ponto</label>
+    <input class="busca" id="busca" type="search" placeholder="Linha, ponto ou trajeto" autocomplete="off">
+    <div class="chips" role="group" aria-label="Tipo de busca">
+      <button class="chip" data-filtro="linhas" aria-pressed="true">Linhas</button>
+      <button class="chip" data-filtro="pontos" aria-pressed="false">Pontos</button>
+      <button class="chip" data-filtro="trajetos" aria-pressed="false">Trajetos</button>
+    </div>
+
+    <div id="resultados"></div>
+
+    <div id="bloco-inicio">
+      <h2>Favoritos</h2>
+      <div id="lista-favoritos"></div>
+
+      <h2>Linhas em operação</h2>
+      <div id="lista-linhas"></div>
+
+      <h2>Pontos perto de você</h2>
+      <div id="lista-perto"></div>
+      <p class="nota">Sem GPS nesta simulação: distâncias medidas a partir do centro de Matão.</p>
+
+      <div class="linha-btns">
+        <button class="btn sec" id="ir-acess">Acessibilidade</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1c: detalhe da linha -->
+  <section class="tela" id="tela-linha" aria-label="Detalhe da linha">
+    <div class="destaque" id="destaque-linha"></div>
+    <label class="sr" for="seletor-parada">Ponto de referência</label>
+    <select class="campo" id="seletor-parada"></select>
+    <div class="abas" role="tablist" aria-label="Informações da linha">
+      <button role="tab" data-aba="proximos" aria-selected="true">Próximos</button>
+      <button role="tab" data-aba="horarios" aria-selected="false">Horários</button>
+      <button role="tab" data-aba="trajeto" aria-selected="false">Trajeto</button>
+    </div>
+    <div id="conteudo-linha"></div>
+    <div class="linha-btns">
+      <button class="btn" id="ver-no-mapa">Ver no mapa</button>
+    </div>
+    <p class="nota" id="nota-linha"></p>
+  </section>
+
+  <!-- 1d: mapa ao vivo -->
+  <section class="tela" id="tela-mapa" aria-label="Mapa ao vivo">
+    <div class="chips" id="filtros-mapa" role="group" aria-label="Filtrar linha no mapa"></div>
+    <div class="mapa-wrap">
+      <div class="mapa" id="mapa-pl"></div>
+      <div class="legenda" id="legenda-mapa">mapa ao vivo</div>
+      <div class="folha oculto" id="folha-veiculo" role="dialog" aria-live="polite"></div>
+    </div>
+    <p class="nota">Posições atualizadas a cada poucos segundos. Previsões sujeitas a variação.</p>
+  </section>
+
+  <!-- 1e: acessibilidade -->
+  <section class="tela" id="tela-acess" aria-label="Acessibilidade">
+    <h1>Acessibilidade</h1>
+    <div class="interruptor"><span>Somente veículos acessíveis</span><input type="checkbox" id="f-veiculo" aria-label="Somente veículos acessíveis"></div>
+    <div class="interruptor"><span>Ponto com rampa</span><input type="checkbox" id="f-rampa" aria-label="Ponto com rampa"></div>
+    <div class="interruptor"><span>Ponto com piso tátil</span><input type="checkbox" id="f-piso" aria-label="Ponto com piso tátil"></div>
+    <h2>Pontos que atendem</h2>
+    <div id="lista-acess"></div>
+    <h2>Ao chegar ao veículo</h2>
+    <div class="cartao" style="cursor:default">
+      <div class="corpo">
+        <div class="nome">Acionar botão de acessibilidade</div>
+        <div class="sub">Avisa o motorista para abaixar a rampa no próximo embarque. Escolha o veículo que está chegando.</div>
+        <div class="linha-btns"><button class="btn perigo" id="btn-acess-chegada">Pedir rampa ao motorista</button></div>
+        <div class="sub" id="estado-acess"></div>
+      </div>
+    </div>
+    <p class="nota">Botões e textos com alvo mínimo de 44 px e contraste de leitura adequado.</p>
+  </section>
+
+  <!-- 1f: historico -->
+  <section class="tela" id="tela-historico" aria-label="Histórico de deslocamento">
+    <h1>Histórico de deslocamento</h1>
+    <div class="cartao" style="cursor:default"><div class="corpo"><div class="sub">Período</div><div class="nome">Simulação · últimas viagens</div></div></div>
+    <div id="lista-historico"></div>
+    <p class="nota">Dados anonimizados (LGPD). Nenhum identificador de veículo ou de passageiro é exibido.</p>
+    <div class="aviso-topo">Quer ver o painel da operação? <a href="/gestor" style="color:#fde68a;font-weight:800">Abrir Gestor · Painel operacional</a></div>
+  </section>
+
+  <!-- Perfil -->
+  <section class="tela" id="tela-perfil" aria-label="Perfil">
+    <h1>Perfil</h1>
+    <div class="cartao" style="cursor:default"><div class="corpo"><div class="nome">Passageiro</div><div class="sub">Preferências salvas neste aparelho.</div></div></div>
+    <h2>Favoritos</h2>
+    <div id="lista-favoritos-perfil"></div>
+    <h2>Preferências</h2>
+    <div class="interruptor"><span>Mostrar apenas veículos acessíveis</span><input type="checkbox" id="p-veiculo" aria-label="Mostrar apenas veículos acessíveis"></div>
+    <div class="interruptor"><span>Alto contraste</span><input type="checkbox" id="p-contraste" aria-label="Alto contraste"></div>
+    <p class="nota">As preferências ficam só neste navegador. Nada é enviado ao servidor.</p>
+  </section>
+</main>
+
+<nav class="nav" aria-label="Navegação principal">
+  <button data-nav="inicio" aria-current="page"><span class="ico">&#8962;</span>Início</button>
+  <button data-nav="mapa"><span class="ico">&#9678;</span>Mapa</button>
+  <button data-nav="historico"><span class="ico">&#8635;</span>Histórico</button>
+  <button data-nav="perfil"><span class="ico">&#9787;</span>Perfil</button>
+</nav>
+
+<div class="toast oculto" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/mapbox-gl@3.3.0/dist/mapbox-gl.js"></script>
+<script src="/vendor/leaflet.js"></script>
+<script src="/vendor/mapa.js"></script>
+<script>
+(function () {
+  "use strict";
+  const MAPBOX_TOKEN = "__MAPBOX_TOKEN__";
+  const CENTRO_MATAO = [-21.6033, -48.3652];
+  const ATUALIZA_MS = 3000;
+  const VIVO_LIMITE_S = 90;
+
+  // ------------------------------------------------------------ estado
+  const E = {
+    linhas: [], pontos: [], veiculos: [], chegadas: [], atendimentos: {},
+    linhaId: null, paradaId: null, aba: "proximos", filtroBusca: "linhas",
+    filtroMapa: "todas", mapa: null, vehiculoSel: null, ultimoOk: 0,
+    filtros: { veiculo: false, rampa: false, piso: false },
+    pedidos: {}, tela: "inicio", historico: null,
+  };
+
+  // ------------------------------------------------------------ utilidades
+  const $ = (id) => document.getElementById(id);
+  const esc = (t) => MapaMC.escapar(t);
+  const pad = (n) => String(n).padStart(2, "0");
+
+  function lerFavoritos() {
+    try { return JSON.parse(localStorage.getItem("mc-favoritos") || "[]"); } catch (_) { return []; }
+  }
+  function gravarFavoritos(lista) {
+    try { localStorage.setItem("mc-favoritos", JSON.stringify(lista)); } catch (_) { /* modo privado */ }
+  }
+  function lerPrefs() {
+    try { return JSON.parse(localStorage.getItem("mc-prefs") || "{}"); } catch (_) { return {}; }
+  }
+  function gravarPrefs(p) {
+    try { localStorage.setItem("mc-prefs", JSON.stringify(p)); } catch (_) { /* ignora */ }
+  }
+
+  function toast(msg) {
+    const t = $("toast");
+    t.textContent = msg; t.classList.remove("oculto");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.add("oculto"), 3800);
+  }
+
+  async function api(caminho, opcoes) {
+    const r = await fetch(caminho, Object.assign({ headers: { "Content-Type": "application/json" } }, opcoes || {}));
+    let dados = null;
+    try { dados = await r.json(); } catch (_) { /* sem corpo */ }
+    if (!r.ok) throw new Error((dados && dados.erro) || ("HTTP " + r.status));
+    return dados;
+  }
+
+  function faixaEta(s) {
+    if (s == null) return "—";
+    const min = Math.round(s / 60);
+    if (min < 1) return "chegando";
+    return min + " min";
+  }
+  function faixaTexto(c) {
+    const a = Math.max(0, Math.round(c.eta_min_s / 60));
+    const b = Math.max(a, Math.round(c.eta_max_s / 60));
+    if (a === b) return b < 1 ? "chegando" : b + " min";
+    return a + " a " + b + " min";
+  }
+  function corLotacao(l) {
+    return l === "alta" || l === "lotado" ? "var(--perigo)" : l === "média" || l === "media" ? "var(--aviso)" : "var(--ok)";
+  }
+  function distanciaM(a, b) {
+    const R = 6371000, toR = (x) => x * Math.PI / 180;
+    const dLat = toR(b[0] - a[0]), dLon = toR(b[1] - a[1]);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a[0])) * Math.cos(toR(b[0])) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  function horaPlanejada(offsetS) {
+    const base = 6 * 3600;
+    const total = Math.round(base + offsetS);
+    return pad(Math.floor(total / 3600) % 24) + ":" + pad(Math.floor((total % 3600) / 60));
+  }
+
+  // ------------------------------------------------------------ dados
+  function linhaPorId(id) { return E.linhas.find((l) => l.id === id) || null; }
+  function veiculosDaLinha(id) { return E.veiculos.filter((v) => v.route_id === id); }
+  function linhaViva(id) {
+    return E.veiculos.some((v) => v.route_id === id && ageS(v.instante) <= VIVO_LIMITE_S);
+  }
+  function ageS(instante) {
+    if (!instante) return Infinity;
+    return (Date.now() - Date.parse(instante)) / 1000;
+  }
+
+  async function carregarBase(forcar) {
+    // cadastro (linhas e pontos) muda pouco: recarrega a cada 30 s, nao a cada tick
+    if (!forcar && E.baseEm && Date.now() - E.baseEm < 30000) return;
+    const [linhas, pontos] = await Promise.all([api("/api/linhas"), api("/api/pontos")]);
+    E.baseEm = Date.now();
+    E.linhas = linhas;
+    E.pontos = pontos.pontos || [];
+    if (!E.linhaId && E.linhas.length) E.linhaId = E.linhas[0].id;
+    const primeira = linhaPorId(E.linhaId);
+    if (primeira && (!E.paradaId || !primeira.paradas.some((p) => p.id === E.paradaId))) {
+      E.paradaId = primeira.paradas[0] ? primeira.paradas[0].id : null;
+    }
+  }
+
+  async function carregarVeiculos() {
+    const dados = await api("/api/passageiro/veiculos");
+    E.veiculos = dados.veiculos || [];
+    E.ultimoOk = Date.now();
+  }
+
+  async function carregarChegadas() {
+    if (!E.linhaId || !E.paradaId) { E.chegadas = []; return; }
+    const dados = await api("/api/passageiro/chegadas?linha=" + encodeURIComponent(E.linhaId) +
+      "&parada=" + encodeURIComponent(E.paradaId));
+    E.chegadas = dados.chegadas || [];
+    E.observacao = dados.observacao || "";
+    E.proximos = dados.proximos_pontos || [];
+    E.chegadas.forEach((c) => { if (c.atendimento) E.atendimentos[c.vehicle_id_publico] = c.atendimento; });
+  }
+
+  async function carregarHistorico() {
+    const dados = await api("/api/historico/chegadas");
+    E.historico = dados.chegadas || [];
+  }
+
+  // ------------------------------------------------------------ status
+  function atualizarStatus() {
+    const pill = $("status");
+    const ok = E.ultimoOk && Date.now() - E.ultimoOk < 10000;
+    pill.textContent = ok ? "● ao vivo" : "sem conexão";
+    pill.className = "pill " + (ok ? "on" : "off");
+  }
+
+  // ------------------------------------------------------------ navegacao
+  const TITULOS = { inicio: "MoveCidade", mapa: "Mapa ao vivo", historico: "Histórico", perfil: "Perfil", acess: "Acessibilidade", linha: "Linha" };
+
+  function mostrar(tela, opcoes) {
+    E.tela = tela;
+    document.querySelectorAll(".tela").forEach((s) => s.classList.remove("ativa"));
+    const alvo = $("tela-" + tela);
+    if (alvo) alvo.classList.add("ativa");
+    const navegaveis = { inicio: "inicio", mapa: "mapa", historico: "historico", perfil: "perfil" };
+    document.querySelectorAll(".nav button").forEach((b) => {
+      if (navegaveis[tela] === b.dataset.nav) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+    const secundaria = tela === "linha" || tela === "acess";
+    $("voltar").classList.toggle("oculto", !secundaria);
+    const linha = linhaPorId(E.linhaId);
+    $("titulo-topo").innerHTML = tela === "linha" && linha
+      ? esc(linha.nome) + "<small>" + esc(linha.paradas.length + " pontos") + "</small>"
+      : (secundaria ? esc(TITULOS[tela]) : "MoveCidade<small>Matao, SP · simulacao</small>");
+    if (tela === "mapa") garantirMapa();
+    if (tela === "historico" && !E.historico) carregarHistorico().then(renderHistorico).catch(() => {});
+    if (opcoes && opcoes.foco) { const el = $(opcoes.foco); el && el.focus(); }
+    window.scrollTo(0, 0);
+    renderTela();
+  }
+
+  function voltar() {
+    if (E.tela === "linha") mostrar("inicio");
+    else if (E.tela === "acess") mostrar("inicio");
+    else mostrar("inicio");
+  }
+
+  // ------------------------------------------------------------ 1a inicio
+  function renderInicio() {
+    const q = ($("busca").value || "").trim().toLowerCase();
+    const filtro = E.filtroBusca;
+    const favoritos = lerFavoritos();
+
+    if (q) {
+      $("bloco-inicio").classList.add("oculto");
+      const linhas = E.linhas.filter((l) => (filtro !== "pontos") && (l.nome.toLowerCase().includes(q) || l.id.toLowerCase().includes(q)));
+      const pontos = E.pontos.filter((p) => (filtro !== "linhas") && p.nome.toLowerCase().includes(q));
+      let html = "<h2>Resultados</h2>";
+      html += linhas.map(cartaoLinha).join("");
+      html += pontos.map((p) => cartaoPonto(p)).join("");
+      if (!linhas.length && !pontos.length) html += '<p class="vazio">Nenhuma linha ou ponto encontrado para “' + esc(q) + '”.</p>';
+      $("resultados").innerHTML = html;
+      return;
+    }
+    $("resultados").innerHTML = "";
+    $("bloco-inicio").classList.remove("oculto");
+
+    const favs = favoritos.map((f) => {
+      if (f.tipo === "linha") { const l = linhaPorId(f.id); return l ? cartaoLinha(l) : ""; }
+      const p = E.pontos.find((x) => x.id === f.id); return p ? cartaoPonto(p) : "";
+    }).join("");
+    $("lista-favoritos").innerHTML = favs || '<p class="vazio">Marque uma linha com ★ para vê-la aqui.</p>';
+
+    $("lista-linhas").innerHTML = E.linhas.map(cartaoLinha).join("") || '<p class="vazio">Nenhuma linha cadastrada.</p>';
+
+    const perto = E.pontos
+      .map((p) => ({ p, d: distanciaM(CENTRO_MATAO, [p.latitude, p.longitude]) }))
+      .sort((a, b) => a.d - b.d).slice(0, 3);
+    $("lista-perto").innerHTML = perto.map(({ p, d }) => cartaoPonto(p, Math.round(d) + " m")).join("");
+  }
+
+  function cartaoLinha(l) {
+    const veic = veiculosDaLinha(l.id);
+    const viva = linhaViva(l.id);
+    const media = veic.length ? veic.reduce((s, v) => s + (v.lotacao === "alta" ? 3 : v.lotacao === "média" || v.lotacao === "media" ? 2 : 1), 0) / veic.length : 0;
+    const lot = !veic.length ? "sem veículo" : media >= 2.5 ? "lotação alta" : media >= 1.6 ? "lotação média" : "lotação baixa";
+    const acess = veic.some((v) => v.acessivel);
+    const status = viva
+      ? '<span class="estado vivo">● ao vivo · ' + veic.length + ' veículo(s)</span>'
+      : '<span class="estado prog">programado · sem sinal ao vivo</span>';
+    const fav = lerFavoritos().some((f) => f.tipo === "linha" && f.id === l.id);
+    return '<div class="cartao" role="group" aria-label="Linha ' + esc(l.nome) + '">' +
+      '<span class="faixa" style="background:' + esc(l.cor) + '"></span>' +
+      '<button class="corpo" style="background:none;border:0;text-align:left;padding:0;color:inherit" data-abrir-linha="' + esc(l.id) + '">' +
+        '<div class="nome">' + esc(l.nome) + '</div>' +
+        '<div class="sub">' + status + '</div>' +
+        '<div class="sub">' + esc(lot) + (acess ? ' · <span class="etiqueta acess">acessível</span>' : '') + '</div>' +
+      '</button>' +
+      '<button class="estrela" aria-pressed="' + fav + '" aria-label="' + (fav ? "Remover dos favoritos" : "Adicionar aos favoritos") + '" data-fav="linha" data-id="' + esc(l.id) + '">' + (fav ? "★" : "☆") + '</button>' +
+    '</div>';
+  }
+
+  function cartaoPonto(p, distancia) {
+    const linhas = E.linhas.filter((l) => l.paradas.some((x) => x.id === p.id)).map((l) => l.nome).join(", ");
+    const fav = lerFavoritos().some((f) => f.tipo === "ponto" && f.id === p.id);
+    return '<div class="cartao">' +
+      '<span class="faixa" style="background:var(--linha)"></span>' +
+      '<button class="corpo" style="background:none;border:0;text-align:left;padding:0;color:inherit" data-abrir-ponto="' + esc(p.id) + '">' +
+        '<div class="nome">' + esc(p.nome) + (distancia ? ' <span class="sub">· ' + esc(distancia) + '</span>' : '') + '</div>' +
+        '<div class="sub">' + esc(linhas || "sem linhas") + '</div>' +
+        '<div class="sub">' + (p.rampa ? '<span class="etiqueta rampa">rampa</span>' : '') + (p.piso_tatil ? '<span class="etiqueta">piso tátil</span>' : '') + '</div>' +
+      '</button>' +
+      '<button class="estrela" aria-pressed="' + fav + '" aria-label="' + (fav ? "Remover dos favoritos" : "Adicionar aos favoritos") + '" data-fav="ponto" data-id="' + esc(p.id) + '">' + (fav ? "★" : "☆") + '</button>' +
+    '</div>';
+  }
+
+  function alternarFavorito(tipo, id) {
+    const lista = lerFavoritos();
+    const i = lista.findIndex((f) => f.tipo === tipo && f.id === id);
+    if (i >= 0) lista.splice(i, 1); else lista.push({ tipo, id });
+    gravarFavoritos(lista);
+    renderTela();
+  }
+
+  // ------------------------------------------------------------ 1c linha
+  function abrirLinha(id) {
+    E.linhaId = id;
+    const l = linhaPorId(id);
+    E.paradaId = l && l.paradas[0] ? l.paradas[0].id : null;
+    E.aba = "proximos";
+    mostrar("linha");
+    carregarChegadas().then(renderLinha).catch(renderLinha);
+  }
+
+  function abrirPonto(pontoId) {
+    const p = E.pontos.find((x) => x.id === pontoId);
+    if (!p) return;
+    const linha = E.linhas.find((l) => l.paradas.some((x) => x.id === pontoId));
+    if (!linha) return;
+    E.linhaId = linha.id; E.paradaId = pontoId;
+    mostrar("linha");
+    carregarChegadas().then(renderLinha).catch(renderLinha);
+  }
+
+  function renderLinha() {
+    const linha = linhaPorId(E.linhaId);
+    if (!linha) { $("destaque-linha").innerHTML = '<p class="vazio">Linha não encontrada.</p>'; return; }
+    const parada = linha.paradas.find((p) => p.id === E.paradaId) || linha.paradas[0];
+    const fav = lerFavoritos().some((f) => f.tipo === "linha" && f.id === linha.id);
+    const primeira = E.chegadas[0];
+    const destaqueTxt = primeira
+      ? '<div class="grande">' + esc(faixaTexto(primeira)) + ' <span>ao seu ponto</span></div>' +
+        '<div class="txt">' + esc(parada.nome) + ' · sujeito a variação</div>'
+      : (linhaViva(linha.id)
+          ? '<div class="grande" style="font-size:1.4rem">Nenhum ônibus chegando</div>' +
+            '<div class="txt">A linha está em operação, mas nenhum veículo se aproxima de ' + esc(parada.nome) + ' agora. Tente outro ponto ou confira o mapa.</div>'
+          : '<div class="grande" style="font-size:1.4rem">Programado</div>' +
+            '<div class="txt">Sem sinal ao vivo desta linha. Consulte os horários planejados para ' + esc(parada.nome) + '.</div>');
+    $("destaque-linha").innerHTML =
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+        '<span style="width:14px;height:14px;border-radius:50%;background:' + esc(linha.cor) + '"></span>' +
+        '<strong style="font-size:1.2rem">' + esc(linha.nome) + '</strong>' +
+        '<button class="estrela" style="margin-left:auto" aria-pressed="' + fav + '" aria-label="Favoritar linha" data-fav="linha" data-id="' + esc(linha.id) + '">' + (fav ? "★" : "☆") + '</button>' +
+      '</div>' + destaqueTxt;
+
+    $("seletor-parada").innerHTML = linha.paradas.map((p) =>
+      '<option value="' + esc(p.id) + '"' + (p.id === parada.id ? " selected" : "") + '>' + esc(p.nome) + '</option>').join("");
+
+    document.querySelectorAll("[data-aba]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.aba === E.aba)));
+    let html = "";
+    if (E.aba === "proximos") {
+      html = E.chegadas.length ? E.chegadas.map((c) => {
+        const acao = c.solicitacao_ativa || E.atendimentos[c.vehicle_id_publico]
+          ? '<span class="etiqueta acess">' + (c.atendimento ? "atendimento confirmado" : "pedido de rampa enviado") + '</span>' : "";
+        return '<div class="cartao" style="cursor:default"><span class="faixa" style="background:' + esc(linha.cor) + '"></span>' +
+          '<div class="corpo"><div class="nome">Veículo ' + esc(c.vehicle_id_publico) + '</div>' +
+          '<div class="sub"><span style="color:' + corLotacao(c.lotacao) + '">● lotação ' + esc(c.lotacao) + '</span>' +
+          (c.acessivel ? ' · <span class="etiqueta acess">acessível</span>' : '') + '</div>' +
+          '<div class="sub">' + acao + '</div></div>' +
+          '<div class="eta">' + esc(faixaEta(c.eta_s)) + '<small>' + esc(c.confianca || "") + '</small></div></div>';
+      }).join("") : '<p class="vazio">Nenhum veículo previsto para este ponto nos próximos minutos.</p>';
+    } else if (E.aba === "horarios") {
+      html = '<div class="cartao" style="cursor:default;flex-direction:column;align-items:stretch">' +
+        linha.paradas.map((p) => '<div class="linha-hist"><div class="corpo"><div class="nome">' + esc(p.nome) + '</div></div><div class="hist-tempo">' + horaPlanejada(p.chegada_planejada_s) + '</div></div>').join("") +
+        '</div><p class="nota">Horários planejados a partir da partida do terminal (06:00). Intervalo previsto de ' + esc(String(linha.headway_planejado_min)) + ' min.</p>';
+    } else {
+      html = linha.paradas.map((p, i) =>
+        '<div class="cartao" style="cursor:default"><div class="corpo"><div class="nome">' + (i + 1) + '. ' + esc(p.nome) + '</div>' +
+        '<div class="sub">' + (p.rampa ? '<span class="etiqueta rampa">rampa</span>' : '<span class="sub">sem rampa</span>') + ' ' +
+        (p.piso_tatil ? '<span class="etiqueta">piso tátil</span>' : '') + '</div></div></div>').join("");
+    }
+    $("conteudo-linha").innerHTML = html;
+    $("nota-linha").textContent = E.observacao || "Previsão sujeita a variação por trânsito, clima e bloqueios.";
+  }
+
+  // ------------------------------------------------------------ 1d mapa
+  function garantirMapa() {
+    if (E.mapa) { E.mapa.redimensionar(); desenharMapa(); return; }
+    E.mapa = MapaMC.criar("mapa-pl", { token: MAPBOX_TOKEN, centro: CENTRO_MATAO, zoom: 14 });
+    E.mapa.aoClicarPonto(() => {});
+    E.mapa.pronto.then(() => desenharMapa());
+    renderFiltrosMapa();
+    desenharMapa();
+  }
+
+  function renderFiltrosMapa() {
+    const chips = [["todas", "Todas"]].concat(E.linhas.map((l) => [l.id, l.nome]));
+    $("filtros-mapa").innerHTML = chips.map(([id, nome]) =>
+      '<button class="chip" data-mapa="' + esc(id) + '" aria-pressed="' + (E.filtroMapa === id) + '">' + esc(nome) + '</button>').join("");
+  }
+
+  function desenharMapa() {
+    if (!E.mapa) return;
+    const linhas = E.filtroMapa === "todas" ? E.linhas : E.linhas.filter((l) => l.id === E.filtroMapa);
+    const veiculos = E.veiculos.filter((v) => E.filtroMapa === "todas" || v.route_id === E.filtroMapa);
+    E.mapa.desenharLinhas(linhas);
+    E.mapa.desenharPontos(E.filtroMapa === "todas" ? [] : E.pontos.filter((p) => linhas[0] && linhas[0].paradas.some((x) => x.id === p.id)));
+    E.mapa.desenharVeiculos(veiculos, (pub) => selecionarVeiculo(pub));
+    $("legenda-mapa").textContent = (E.mapa.tipo === "mapbox" ? "mapa ao vivo (Mapbox)" : "mapa ao vivo (base local)") +
+      " · " + veiculos.length + " veículo(s)";
+    if (E.vehiculoSel) renderFolha();
+  }
+
+  function selecionarVeiculo(pub) { E.vehiculoSel = pub; renderFolha(); }
+
+  // centraliza o mapa no trajeto da linha escolhida (ponto medio da rota)
+  function centralizarLinhaNoMapa() {
+    const linha = linhaPorId(E.filtroMapa);
+    if (!linha || !E.mapa || !linha.rota.length) return;
+    const meio = linha.rota[Math.floor(linha.rota.length / 2)];
+    E.mapa.centralizar(meio[0], meio[1], 14);
+  }
+
+  function renderFolha() {
+    const v = E.veiculos.find((x) => x.vehicle_id_publico === E.vehiculoSel);
+    const folha = $("folha-veiculo");
+    if (!v) { folha.classList.add("oculto"); return; }
+    const linha = linhaPorId(v.route_id);
+    const atendido = v.atendimento === "confirmado";
+    const status = atendido ? "Atendimento confirmado: o motorista foi avisado."
+      : v.solicitacao_ativa ? "Pedido enviado. Aguardando o motorista."
+      : "Nenhum pedido de rampa em andamento.";
+    folha.innerHTML = '<button class="btn sec fechar" data-fechar-folha aria-label="Fechar">✕</button>' +
+      '<h3>Veículo ' + esc(v.vehicle_id_publico) + ' · ' + esc(linha ? linha.nome : v.route_id) + '</h3>' +
+      '<div class="sub">Próxima parada: <strong>' + esc(v.proxima_parada || "—") + '</strong></div>' +
+      '<div class="sub">Lotação: <span style="color:' + corLotacao(v.lotacao) + '">' + esc(v.lotacao) + '</span>' +
+      (v.acessivel ? ' · <span class="etiqueta acess">acessível</span>' : ' · sem acessibilidade') + '</div>' +
+      '<div class="sub" style="margin:8px 0">' + esc(status) + '</div>' +
+      '<div class="linha-btns"><button class="btn perigo" data-pedir-rampa="' + esc(v.vehicle_id_publico) + '"' +
+      (v.solicitacao_ativa || atendido ? " disabled" : "") + '>Pedir rampa ao motorista</button></div>';
+    folha.classList.remove("oculto");
+  }
+
+  // ------------------------------------------------------------ 1e acessibilidade
+  function renderAcess() {
+    const f = E.filtros;
+    const pontos = E.pontos.filter((p) => (!f.rampa || p.rampa) && (!f.piso || p.piso_tatil));
+    $("f-veiculo").checked = f.veiculo; $("f-rampa").checked = f.rampa; $("f-piso").checked = f.piso;
+    $("lista-acess").innerHTML = pontos.map((p) => cartaoPonto(p)).join("") || '<p class="vazio">Nenhum ponto com esses critérios.</p>';
+    const chegadaAcess = E.chegadas.filter((c) => !f.veiculo || c.acessivel);
+    const alvo = chegadaAcess[0];
+    const estado = $("estado-acess");
+    if (!alvo) estado.textContent = "Nenhum veículo previsto para o ponto escolhido.";
+    else if (alvo.atendimento === "confirmado") estado.textContent = "Atendimento confirmado pelo motorista.";
+    else if (alvo.solicitacao_ativa) estado.textContent = "Pedido enviado. Aguardando o motorista.";
+    else estado.textContent = "Próximo veículo: " + alvo.vehicle_id_publico + " · " + faixaTexto(alvo);
+    $("btn-acess-chegada").disabled = !alvo || alvo.solicitacao_ativa || alvo.atendimento === "confirmado";
+  }
+
+  // ------------------------------------------------------------ 1f historico
+  function renderHistorico() {
+    const itens = E.historico || [];
+    if (!itens.length) { $("lista-historico").innerHTML = '<p class="vazio">Ainda não há viagens registradas nesta simulação.</p>'; return; }
+    $("lista-historico").innerHTML = itens.slice(0, 20).map((c) => {
+      const linha = linhaPorId(c.route_id);
+      const min = Math.round(Math.abs(c.desvio_s) / 60);
+      const pontual = Math.abs(c.desvio_s) <= 120;
+      const texto = pontual ? '<span class="ok">no horário</span>' : c.desvio_s > 0 ? '<span class="atraso">atrasou ' + min + ' min</span>' : '<span class="ok">adiantou ' + min + ' min</span>';
+      return '<div class="linha-hist"><span class="bolinha" style="background:' + esc(linha ? linha.cor : "#94a3b8") + '"></span>' +
+        '<div class="corpo"><div class="nome" style="font-size:1rem">' + esc(linha ? linha.nome : c.route_id) + '</div>' +
+        '<div class="sub">Chegada em ' + esc(c.stop_name) + '</div></div>' +
+        '<div class="hist-tempo">' + texto + '</div></div>';
+    }).join("");
+  }
+
+  function renderPerfil() {
+    const favs = lerFavoritos();
+    $("lista-favoritos-perfil").innerHTML = favs.length ? favs.map((f) => {
+      if (f.tipo === "linha") { const l = linhaPorId(f.id); return l ? cartaoLinha(l) : ""; }
+      const p = E.pontos.find((x) => x.id === f.id); return p ? cartaoPonto(p) : "";
+    }).join("") : '<p class="vazio">Nenhum favorito ainda.</p>';
+    const prefs = lerPrefs();
+    $("p-veiculo").checked = !!prefs.somenteAcessivel;
+    $("p-contraste").checked = !!prefs.altoContraste;
+    document.body.classList.toggle("contraste", !!prefs.altoContraste);
+  }
+
+  // ------------------------------------------------------------ roteamento de render
+  function renderTela() {
+    if (E.tela === "inicio") renderInicio();
+    else if (E.tela === "linha") renderLinha();
+    else if (E.tela === "mapa") desenharMapa();
+    else if (E.tela === "acess") renderAcess();
+    else if (E.tela === "perfil") renderPerfil();
+    else if (E.tela === "historico") renderHistorico();
+  }
+
+  // ------------------------------------------------------------ pedido de rampa
+  async function pedirRampa(pub) {
+    try {
+      await api("/api/passageiro/acessibilidade", { method: "POST", body: JSON.stringify({ vehicle_id_publico: pub }) });
+      E.pedidos[pub] = Date.now();
+      toast("Pedido enviado ao motorista. Aguarde o atendimento.");
+      await atualizar();
+    } catch (erro) {
+      toast("Não foi possível enviar o pedido: " + erro.message);
+    }
+  }
+
+  // ------------------------------------------------------------ atualizacao
+  let emAtualizacao = false;
+  async function atualizar() {
+    if (emAtualizacao) return;
+    emAtualizacao = true;
+    try {
+      await carregarBase();
+      await carregarVeiculos();
+      if (E.linhaId && E.paradaId) await carregarChegadas();
+      atualizarStatus();
+      renderTela();
+    } catch (_) {
+      atualizarStatus();
+    } finally {
+      emAtualizacao = false;
+    }
+  }
+
+  function iniciarTempoReal() {
+    setInterval(atualizar, ATUALIZA_MS);
+    atualizarStatus();
+    setInterval(atualizarStatus, 2000);
+    try {
+      const fonte = new EventSource("/api/stream");
+      let t = null;
+      fonte.onmessage = () => { clearTimeout(t); t = setTimeout(atualizar, 300); };
+      fonte.onerror = () => { /* o polling continua cobrindo a atualizacao */ };
+    } catch (_) { /* sem SSE: polling basta */ }
+  }
+
+  // ------------------------------------------------------------ eventos
+  document.addEventListener("click", (ev) => {
+    const alvo = ev.target.closest("button, [data-nav]");
+    if (!alvo) return;
+    if (alvo.dataset.nav) { mostrar(alvo.dataset.nav); return; }
+    if (alvo.dataset.abrirLinha) return abrirLinha(alvo.dataset.abrirLinha);
+    if (alvo.dataset.abrirPonto) return abrirPonto(alvo.dataset.abrirPonto);
+    if (alvo.dataset.fav) return alternarFavorito(alvo.dataset.fav, alvo.dataset.id);
+    if (alvo.dataset.aba) { E.aba = alvo.dataset.aba; return renderLinha(); }
+    if (alvo.dataset.mapa) {
+      E.filtroMapa = alvo.dataset.mapa; renderFiltrosMapa(); desenharMapa(); centralizarLinhaNoMapa(); return;
+    }
+    if (alvo.dataset.fecharFolha !== undefined) { E.vehiculoSel = null; return renderFolha(); }
+    if (alvo.dataset.pedirRampa) return pedirRampa(alvo.dataset.pedirRampa);
+    if (alvo.dataset.filtro) {
+      E.filtroBusca = alvo.dataset.filtro;
+      document.querySelectorAll("[data-filtro]").forEach((b) => b.setAttribute("aria-pressed", String(b === alvo)));
+      return renderInicio();
+    }
+  });
+
+  $("voltar").addEventListener("click", voltar);
+  $("busca").addEventListener("input", renderInicio);
+  $("ir-acess").addEventListener("click", () => mostrar("acess", { foco: "f-veiculo" }));
+  $("ver-no-mapa").addEventListener("click", () => {
+    E.filtroMapa = E.linhaId; mostrar("mapa");
+    setTimeout(centralizarLinhaNoMapa, 300);
+  });
+  $("seletor-parada").addEventListener("change", (ev) => {
+    E.paradaId = ev.target.value;
+    carregarChegadas().then(renderLinha).catch(renderLinha);
+  });
+  ["f-veiculo", "f-rampa", "f-piso"].forEach((id) => $(id).addEventListener("change", () => {
+    E.filtros = { veiculo: $("f-veiculo").checked, rampa: $("f-rampa").checked, piso: $("f-piso").checked };
+    renderAcess();
+  }));
+  $("btn-acess-chegada").addEventListener("click", () => {
+    const f = E.filtros;
+    const alvo = E.chegadas.filter((c) => !f.veiculo || c.acessivel)[0];
+    if (alvo) pedirRampa(alvo.vehicle_id_publico);
+  });
+  ["p-veiculo", "p-contraste"].forEach((id) => $(id).addEventListener("change", () => {
+    const p = lerPrefs();
+    p.somenteAcessivel = $("p-veiculo").checked;
+    p.altoContraste = $("p-contraste").checked;
+    gravarPrefs(p);
+    renderPerfil();
+  }));
+  $("filtros-mapa").addEventListener("click", () => {});
+  document.querySelectorAll("[data-filtro]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filtro === E.filtroBusca)));
+
+  // ------------------------------------------------------------ inicio
+  (function aplicarPrefs() {
+    const prefs = lerPrefs();
+    document.body.classList.toggle("contraste", !!prefs.altoContraste);
+    E.filtros.veiculo = !!prefs.somenteAcessivel;
+  })();
+  atualizar().then(() => { renderInicio(); iniciarTempoReal(); });
+})();
+</script>
+</body>
+</html>
