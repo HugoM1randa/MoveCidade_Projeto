@@ -9,7 +9,7 @@ def test_ordena_por_distancia_e_respeita_limite(repo):
     r = pontos_proximos(repo, *MATRIZ, raio=800, limite=3)
     pontos = r["pontos"]
     assert 1 <= len(pontos) <= 3
-    assert pontos[0]["nome"] == "Praça da Matriz"
+    assert pontos[0]["id"] == "centro"
     distancias = [p["distancia_m"] for p in pontos]
     assert distancias == sorted(distancias)
     assert all(d <= 800 for d in distancias)
@@ -22,9 +22,9 @@ def test_tempo_a_pe_80_m_por_minuto(repo):
 
 
 def test_ponto_compartilhado_lista_todas_as_linhas(repo):
-    matriz = pontos_proximos(repo, *MATRIZ)["pontos"][0]
-    assert {l["numero"] for l in matriz["linhas"]} == {"101", "102", "205"}
-    for l in matriz["linhas"]:
+    centro = pontos_proximos(repo, *MATRIZ)["pontos"][0]
+    assert {l["numero"] for l in centro["linhas"]} == {"Azul", "Verde", "Vermelha"}
+    for l in centro["linhas"]:
         assert l["cor"].startswith("#") and l["fonte"] in ("ao_vivo", "programado", "sem_previsao")
 
 
@@ -35,6 +35,7 @@ def test_sem_ponto_no_raio_mostra_o_mais_proximo(repo):
 
 
 def test_filtro_rampa_e_piso_tatil(repo):
+    repo.ponto("av-15-de-novembro").acessibilidade.update(rampa=True, piso_tatil=True)
     r = pontos_proximos(repo, *MATRIZ, raio=3000, limite=10, rampa=True, piso_tatil=True)
     assert r["pontos"]
     for p in r["pontos"]:

@@ -8,8 +8,8 @@ from .conftest import pacote
 def test_pacote_valido_e_aceito(cliente, repo):
     r = cliente.post("/api/iot/telemetria", json=pacote(repo))
     assert r.status_code == 200
-    assert r.json()["vehicle_id"] == "102-A"
-    assert repo.ao_vivo("102-A")
+    assert r.json()["vehicle_id"] == "AZ-SR-1"
+    assert repo.ao_vivo("AZ-SR-1")
 
 
 @pytest.mark.parametrize("campo,valor,trecho", [
@@ -52,15 +52,15 @@ def test_json_invalido(cliente):
 
 
 def test_lotacao_critica_gera_alerta_e_so_executa_com_aceite(gestor, repo):
-    antes = len(repo.veiculos("102"))
-    repo.ingerir(pacote(repo, "102-A", passenger_count=70, occupancy_rate=1.13, occupancy_alert=True,
+    antes = len(repo.veiculos("azul-santa-rosa"))
+    repo.ingerir(pacote(repo, "AZ-SR-1", passenger_count=70, occupancy_rate=1.13, occupancy_alert=True,
                         anomaly_flag="CRITICAL_OVERCROWDING"))
     pendentes = gestor.get("/api/gestor/alertas").json()["pendentes"]
     alerta = next(a for a in pendentes if a["tipo"] == "lotacao")
-    assert len(repo.veiculos("102")) == antes          # nada executado sem aceite
+    assert len(repo.veiculos("azul-santa-rosa")) == antes          # nada executado sem aceite
     r = gestor.post(f"/api/gestor/alertas/{alerta['id']}/decisao", json={"decisao": "aceitar"})
     assert r.status_code == 200 and r.json()["decisao"] == "aceito"
-    assert len(repo.veiculos("102")) == antes + 1      # reserva colocado após o aceite
+    assert len(repo.veiculos("azul-santa-rosa")) == antes + 1      # reserva colocado após o aceite
     pendentes = gestor.get("/api/gestor/alertas").json()["pendentes"]
     assert all(a["id"] != alerta["id"] for a in pendentes)
 

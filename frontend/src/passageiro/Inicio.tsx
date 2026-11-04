@@ -1,5 +1,5 @@
 import type L from 'leaflet';
-import { Crosshair, MapPin, Search } from 'lucide-react';
+import { Crosshair, LocateFixed, LocateOff, MapPin, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { query } from '../api';
@@ -7,12 +7,14 @@ import { AvisoErro, BadgeLinha, Esqueleto, usePagina } from '../componentes/comu
 import { useAnunciar } from '../estado/Anunciador';
 import { useCatalogo } from '../estado/Catalogo';
 import { usePreferencias } from '../estado/Preferencias';
+import { MENSAGENS_GPS, useLocalizacaoReal } from '../estado/useLocalizacaoReal';
 import { usePolling } from '../estado/usePolling';
 import { MapaBase, useCamadaOnibus, useCamadaPontos, useCamadaRotas, usePino } from '../mapa/Mapa';
 import type { DetalheLinha, PontoComChegadas, RespostaProximos, VeiculoMapa } from '../tipos';
 import { distancia, tempoDeChegada, trajetoCurto } from '../util/formato';
 import type { Posicao } from '../util/geo';
 import { CartaoPonto, LinhaChegada } from './CartaoPonto';
+import { LinhasDeMatao } from './LinhasDeMatao';
 
 type TipoBusca = 'linhas' | 'pontos' | 'trajetos';
 
@@ -28,6 +30,11 @@ export function Inicio() {
   const [tipo, setTipo] = useState<TipoBusca>('linhas');
   const anunciarProxima = useRef(false);
   const estadosAnteriores = useRef(new Map<string, string>());
+  const gps = useLocalizacaoReal((p) => {
+    anunciarProxima.current = true;
+    setPino(p);
+  });
+  const gpsAtivo = gps.estado === 'ativo' || gps.estado === 'buscando';
 
   // move o pino na hora; a consulta espera o usuário parar (evita uma requisição por tecla)
   useEffect(() => {
@@ -49,6 +56,7 @@ export function Inicio() {
   const dadosRef = useRef(dados);
   dadosRef.current = dados;
   usePino(mapa, pino, (p) => {
+    gps.desligar(); // mexeu no pino à mão: sai do modo "tempo real"
     anunciarProxima.current = true;
     setPino(p);
   }, () => {
@@ -129,15 +137,29 @@ export function Inicio() {
         </form>
       </div>
 
+      <LinhasDeMatao />
+
       <div className="inicio-grade">
         <section className="bloco-mapa" aria-labelledby="titulo-local">
           <h2 id="titulo-local" className="sr-only">Sua localização no mapa</h2>
           <div className="mapa-moldura">
-            <MapaBase rotulo="Mapa de Matão com sua localização simulada, os pontos próximos e os ônibus" className="mapa-compacto" aoPronto={setMapa} zoom={15} centro={[pino.lat, pino.lon]} />
-            <span className="selo-simulado"><MapPin aria-hidden="true" size={16} /> Localização simulada</span>
+            <MapaBase rotulo={gps.estado === 'ativo' ? 'Mapa de Matão com sua localização em tempo real, os pontos próximos e os ônibus' : 'Mapa de Matão com o pino de localização, os pontos próximos e os ônibus'} className="mapa-compacto" aoPronto={setMapa} zoom={15} centro={[pino.lat, pino.lon]} />
+            <span className={`selo-simulado${gps.estado === 'ativo' ? ' ao-vivo' : ''}`}>
+              {gps.estado === 'ativo' ? <LocateFixed aria-hidden="true" size={16} /> : <MapPin aria-hidden="true" size={16} />}
+              {gps.estado === 'ativo' ? 'Sua localização em tempo real' : 'Localização escolhida no mapa'}
+            </span>
           </div>
+          <button type="button" className={`botao ${gpsAtivo ? 'secundario' : 'primario'} largo`}
+            aria-pressed={gpsAtivo} onClick={gpsAtivo ? gps.desligar : gps.ligar}>
+            {gpsAtivo ? <LocateOff aria-hidden="true" size={20} /> : <LocateFixed aria-hidden="true" size={20} />}
+            {gpsAtivo ? 'Parar de usar minha localização' : 'Usar minha localização'}
+          </button>
+          <p className={`ajuda-mapa${gps.estado === 'negado' || gps.estado === 'indisponivel' || gps.estado === 'fora' ? ' aviso-gps' : ''}`} role="status">
+            {MENSAGENS_GPS[gps.estado]}
+            {gps.estado === 'ativo' && gps.precisaoM !== null ? ` Precisão de cerca de ${gps.precisaoM} m.` : ''}
+          </p>
           <p className="ajuda-mapa" id="ajuda-pino">
-            Toque no mapa ou arraste o pino para mudar sua localização. Pelo teclado: Tab até o pino e use as setas.
+            Sem GPS? Toque no mapa ou arraste o pino. Pelo teclado: Tab até o pino e use as setas (Shift anda 100 m). Sua posição não é gravada.
           </p>
           <button type="button" className="botao secundario" onClick={pinoNoCentro}>
             <Crosshair aria-hidden="true" size={20} /> Colocar pino no centro do mapa

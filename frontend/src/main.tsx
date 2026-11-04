@@ -14,6 +14,7 @@ import { LayoutPassageiro } from './passageiro/Layout';
 import { MapaAoVivo } from './passageiro/MapaAoVivo';
 import { NaoEncontrada } from './passageiro/NaoEncontrada';
 import './estilos.css';
+import './tema.css';
 
 // O painel do gestor é carregado só quando alguém abre /gestor (o app do passageiro fica mais leve).
 const Login = lazy(() => import('./gestor/Login').then((m) => ({ default: m.Login })));

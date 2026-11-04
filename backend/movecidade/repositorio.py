@@ -549,7 +549,10 @@ class Repositorio:
 
     # =========================================================== CRUD: linhas
     def cores_em_uso(self, exceto: Optional[str] = None) -> List[str]:
-        return [l.cor for l in self.linhas() if l.id != exceto]
+        # os dois itinerários da mesma linha (ex.: Azul → Santa Rosa e Bairro Alto) dividem a cor
+        alvo = self.linha(exceto) if exceto else None
+        return [l.cor for l in self.linhas()
+                if l.id != exceto and not (alvo is not None and l.cor_nome == alvo.cor_nome)]
 
     def proxima_cor_livre(self) -> Dict[str, str]:
         usadas = {c.upper() for c in self.cores_em_uso()}

@@ -10,27 +10,27 @@ from .conftest import pacote
 
 
 def test_ponto_a_frente_usa_velocidade_fallback(repo):
-    linha = repo.linha("102")
+    linha = repo.linha("azul-santa-rosa")
     ativos = repo.pontos_ativos_da_linha(linha)
     s_v = 100.0
-    s_p = linha.s_pontos[2]  # Rodoviária, com 1 parada intermediária (Escola)
+    s_p = linha.s_pontos[2]  # 3º ponto da linha, com 1 parada intermediária
     t = eta_simulacao(linha, HistoricoTrechos(), ativos, s_v, False, s_p)
     esperado = (s_p - s_v) / (config.VELOCIDADE_FALLBACK_KMH / 3.6) + 1 * config.PARADA_MEDIA_S
     assert t == pytest.approx(esperado, rel=1e-6)
 
 
 def test_usa_velocidade_historica_do_trecho(repo):
-    linha = repo.linha("102")
+    linha = repo.linha("azul-santa-rosa")
     ativos = repo.pontos_ativos_da_linha(linha)
     hist = HistoricoTrechos()
-    hist.registrar("102", 0, 36.0)  # 10 m/s no primeiro trecho
+    hist.registrar("azul-santa-rosa", 0, 36.0)  # 10 m/s no primeiro trecho
     s_p = linha.s_pontos[1]
     t = eta_simulacao(linha, hist, ativos, 0.0, False, s_p)
     assert t == pytest.approx(s_p / 10.0, rel=1e-6)
 
 
 def test_onibus_ja_passou_espera_a_proxima_volta(repo):
-    linha = repo.linha("102")
+    linha = repo.linha("azul-santa-rosa")
     ativos = repo.pontos_ativos_da_linha(linha)
     hist = HistoricoTrechos()
     s_p = linha.s_pontos[1]
@@ -43,7 +43,7 @@ def test_onibus_ja_passou_espera_a_proxima_volta(repo):
 
 
 def test_onibus_parado_no_ponto_chega_agora(repo):
-    linha = repo.linha("102")
+    linha = repo.linha("azul-santa-rosa")
     ativos = repo.pontos_ativos_da_linha(linha)
     s_p = linha.s_pontos[2]
     assert eta_simulacao(linha, HistoricoTrechos(), ativos, s_p, True, s_p) == 0.0
@@ -55,19 +55,19 @@ def test_conversao_para_relogio_do_usuario(monkeypatch):
 
 
 def test_previsao_ao_vivo_menor_e_seguinte(repo):
-    linha = repo.linha("102")
-    for vid, prog in (("102-A", 0.02), ("102-B", 0.5), ("102-C", 0.9)):
+    linha = repo.linha("azul-santa-rosa")
+    for vid, prog in (("AZ-SR-1", 0.02), ("AZ-SR-2", 0.97)):
         repo.ingerir(pacote(repo, vid, progresso=prog))
-    p = previsao_linha_no_ponto(repo, linha, "rodoviaria")
+    p = previsao_linha_no_ponto(repo, linha, linha.pontos[-1])
     assert p["fonte"] == "ao_vivo"
-    assert p["veiculo_id"] == "102-A"          # o mais próximo antes do ponto
+    assert p["veiculo_id"] == "AZ-SR-1"          # o mais próximo antes do ponto
     assert p["eta_seguinte_s"] > p["eta_s"]
 
 
 def test_sem_telemetria_recente_vira_programado(repo, monkeypatch):
-    linha = repo.linha("102")
-    repo.ingerir(pacote(repo, "102-A", progresso=0.02))
+    linha = repo.linha("azul-santa-rosa")
+    repo.ingerir(pacote(repo, "AZ-SR-1", progresso=0.02))
     monkeypatch.setattr(config, "SEM_SINAL_APOS_S", -1.0)   # todo sinal já está "velho"
-    p = previsao_linha_no_ponto(repo, linha, "rodoviaria")
+    p = previsao_linha_no_ponto(repo, linha, linha.pontos[-1])
     assert p["fonte"] in ("programado", "sem_previsao")
     assert p["fonte"] != "ao_vivo"

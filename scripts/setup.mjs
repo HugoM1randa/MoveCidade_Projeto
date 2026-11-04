@@ -1,7 +1,7 @@
 // Prepara tudo na primeira vez: .env, ambiente Python (FastAPI) e dependências do front.
 // Nas próximas vezes só confere e segue (rápido).
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { acharPython, BACKEND, existe, FRONTEND, PYTHON_VENV, RAIZ, rodar } from './comum.mjs';
 
@@ -45,4 +45,19 @@ const nm = join(FRONTEND, 'node_modules');
 if (!existe(nm) || statSync(join(FRONTEND, 'package.json')).mtimeMs > statSync(nm).mtimeMs) {
   console.log('[MoveCidade] Instalando dependências do front-end …');
   rodar('npm', ['install', '--no-fund', '--no-audit'], { cwd: FRONTEND });
+}
+
+// Dados reais de Matão (linhas Azul, Verde e Vermelha). Na primeira vez: descobre a posição das ruas dos
+// itinerários (precisa de internet; se falhar, o app abre só com as paradas já conhecidas) e recarrega o banco.
+const dadosDir = join(BACKEND, 'dados');
+const marcaSeed = join(dadosDir, '.seed-matao-real');
+const ruasJson = join(BACKEND, 'movecidade', 'seed', 'ruas_matao.json');
+if (!existe(marcaSeed)) {
+  mkdirSync(dadosDir, { recursive: true });
+  rmSync(join(dadosDir, 'movecidade.db'), { force: true }); // banco da versão antiga (linhas fictícias)
+  if (!existe(ruasJson)) {
+    console.log('[MoveCidade] Localizando as ruas dos itinerários de Matão (OpenStreetMap) — leva ~1 min …');
+    spawnSync(PYTHON_VENV, ['-m', 'scripts.gerar_ruas_matao'], { stdio: 'inherit', cwd: BACKEND });
+  }
+  writeFileSync(marcaSeed, 'ok');
 }

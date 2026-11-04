@@ -31,13 +31,13 @@ def test_cor_escura_nova_e_aprovada():
 
 def test_api_recusa_linha_com_cor_ruim(gestor):
     r = gestor.post("/api/linhas", json={"numero": "410", "nome": "Teste", "cor": "#FDE047",
-                                          "pontos": ["terminal", "hospital"]})
+                                          "pontos": ["centro", "av-15-de-novembro"]})
     assert r.status_code == 422
     assert "contraste" in r.json()["erro"]
 
 
 def test_nova_linha_recebe_proxima_cor_livre(gestor):
-    r = gestor.post("/api/linhas", json={"numero": "410", "nome": "Centro – Hospital",
-                                          "pontos": ["terminal", "hospital"]})
+    r = gestor.post("/api/linhas", json={"numero": "410", "nome": "Centro – Teste",
+                                          "pontos": ["centro", "av-15-de-novembro"]})
     assert r.status_code == 201
-    assert r.json()["cor"] == "#BE185D"   # primeira cor reserva da paleta
+    assert r.json()["cor"] == "#7E22CE"   # primeira cor livre da paleta (azul, verde e vermelha já são das linhas de Matão)
