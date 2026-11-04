@@ -40,7 +40,7 @@ def gestor(cliente):
     return cliente
 
 
-def pacote(repo, veiculo_id="102-A", progresso=0.1, **extra):
+def pacote(repo, veiculo_id="AZ-SR-1", progresso=0.1, **extra):
     """Pacote de telemetria válido do contrato, posicionado em `progresso` da volta."""
     veiculo = repo.veiculo(veiculo_id)
     linha = repo.linha(veiculo.linha_id)

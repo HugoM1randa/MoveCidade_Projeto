@@ -8,7 +8,7 @@ import { useAnunciar } from '../estado/Anunciador';
 import { useCatalogo } from '../estado/Catalogo';
 import { usePreferencias } from '../estado/Preferencias';
 import { usePolling } from '../estado/usePolling';
-import type { DetalheLinha as Detalhe, ProximoVeiculo } from '../tipos';
+import type { DetalheLinha as Detalhe, ProximoVeiculo, TipoDia } from '../tipos';
 import { rotuloLinha, tempoDeChegada, trajetoCurto } from '../util/formato';
 
 export function DetalheLinha() {
@@ -161,23 +161,71 @@ function AbaProximos({ dados }: { dados: Detalhe }) {
   );
 }
 
+const ROTULO_DIA: Record<TipoDia, string> = { uteis: 'Dias úteis', sabado: 'Sábado', domingo: 'Domingo e feriados' };
+
+function agoraHHMM(): string {
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+}
+
 function AbaHorarios({ dados }: { dados: Detalhe }) {
-  if (!dados.horarios.length) return <p className="vazio">Sem horários programados para este ponto.</p>;
+  const q = dados.quadro;
+  const [dia, setDia] = useState<TipoDia | null>(null);
+  const diaAtual: TipoDia = dia ?? q?.tipo_dia_hoje ?? 'uteis';
   return (
     <>
-      <table className="tabela">
-        <caption>Próximos horários programados no ponto {dados.ponto?.nome}</caption>
-        <thead>
-          <tr><th scope="col">Horário</th><th scope="col">Situação</th></tr>
-        </thead>
-        <tbody>
-          {dados.horarios.map((h, i) => (
-            <tr key={h + i}><td>{h}</td><td>programado</td></tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="nota">Uma partida a cada {dados.intervalo_min} min, das 05h à meia-noite. Os horários ao vivo aparecem na aba Próximos.</p>
+      {dados.horarios.length > 0 && (
+        <table className="tabela">
+          <caption>Próximas passagens previstas no ponto {dados.ponto?.nome}</caption>
+          <thead>
+            <tr><th scope="col">Horário</th><th scope="col">Situação</th></tr>
+          </thead>
+          <tbody>
+            {dados.horarios.map((h, i) => (
+              <tr key={h + i}><td>{h}</td><td>programado</td></tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {q ? (
+        <section className="quadro" aria-labelledby="titulo-quadro">
+          <h3 id="titulo-quadro">Quadro oficial de horários</h3>
+          <fieldset className="filtro-busca">
+            <legend className="sr-only">Dia da semana</legend>
+            {(Object.keys(ROTULO_DIA) as TipoDia[]).map((d) => (
+              <label key={d} className={`chip${diaAtual === d ? ' ativo' : ''}`}>
+                <input type="radio" name="dia-quadro" value={d} checked={diaAtual === d} onChange={() => setDia(d)} />
+                {ROTULO_DIA[d]}
+              </label>
+            ))}
+          </fieldset>
+          <ListaSaidas titulo="Saídas do Centro" sentido={`Centro → ${q.destino}`} horarios={q.do_centro[diaAtual]} hoje={diaAtual === q.tipo_dia_hoje} />
+          <ListaSaidas titulo={`Saídas do bairro (${q.destino})`} sentido={`${q.destino} → Centro`} horarios={q.para_centro[diaAtual]} hoje={diaAtual === q.tipo_dia_hoje} />
+          {q.observacoes && <p className="nota">{q.observacoes}</p>}
+          <p className="nota">Fonte: {q.fonte}, quadro de {q.referencia}. Horários podem mudar; confirme com a operadora.</p>
+        </section>
+      ) : (
+        <p className="nota">Uma partida a cada {dados.intervalo_min} min, das 05h à meia-noite. Os horários ao vivo aparecem na aba Próximos.</p>
+      )}
     </>
+  );
+}
+
+function ListaSaidas({ titulo, sentido, horarios, hoje }: { titulo: string; sentido: string; horarios: string[]; hoje: boolean }) {
+  const agora = agoraHHMM();
+  const proximo = hoje ? horarios.find((h) => h >= agora) : undefined;
+  return (
+    <div className="saidas">
+      <h4>{titulo} <span className="nota">({sentido})</span></h4>
+      {horarios.length === 0 ? <p className="vazio">Não há saídas neste dia.</p> : (
+        <ul className="horas" aria-label={`${titulo}: ${horarios.length} saídas`}>
+          {horarios.map((h) => (
+            <li key={h} className={h === proximo ? 'proxima' : ''}>
+              {h}{h === proximo && <span className="sr-only"> (próxima saída)</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

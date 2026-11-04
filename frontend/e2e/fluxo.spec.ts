@@ -18,7 +18,7 @@ test('passageiro: pino pelo teclado → pontos próximos com previsão → detal
   await expect(page).toHaveTitle(/Início/);
   await expect(page.getByRole('heading', { name: 'Pontos perto de você' })).toBeVisible();
   const titulos = page.locator('.lista-pontos .titulo-ponto');
-  await expect(titulos.first()).toHaveText('Praça da Matriz');
+  await expect(titulos.first()).toHaveText('Centro (Praça Sete de Setembro)');
   await expect(page.locator('.lista-pontos .chegada').first()).toBeVisible();
   await expect(page.locator('.lista-pontos .chegada-tempo .tempo').first()).toHaveText(/min|agora|chegando|sem previsão/);
   await checarAxe(page, 'Início');
@@ -29,12 +29,12 @@ test('passageiro: pino pelo teclado → pontos próximos com previsão → detal
   for (let i = 0; i < 8; i++) await page.keyboard.press('Shift+ArrowLeft');
   await page.keyboard.press('Enter');
   await expect(page.locator('[aria-live="polite"]')).toContainText('Ponto mais próximo', { timeout: 15_000 });
-  await expect(titulos.first()).not.toHaveText('Praça da Matriz');
+  await expect(titulos.first()).not.toHaveText('Centro (Praça Sete de Setembro)');
 
   // abre o detalhe da primeira linha do primeiro ponto
   await page.locator('.lista-pontos .chegada').first().click();
   await expect(page).toHaveURL(/\/linha\//);
-  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Linha \d+/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Linha (Azul|Verde|Vermelha)/);
   await expect(page.getByRole('tab', { name: 'Próximos' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('sujeito a variação').first()).toBeVisible();
   await checarAxe(page, 'Detalhe da linha');
@@ -43,6 +43,24 @@ test('passageiro: pino pelo teclado → pontos próximos com previsão → detal
   await expect(page.locator('ol.trajeto li').first()).toBeVisible();
   await page.getByRole('tab', { name: 'Horários' }).click();
   await expect(page.getByRole('table')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Quadro oficial de horários' })).toBeVisible();
+  await page.getByLabel('Sábado').check();
+  await expect(page.getByRole('list', { name: /Saídas do Centro/ })).toBeVisible();
+});
+
+test.describe('localização real', () => {
+  test.use({ permissions: ['geolocation'], geolocation: { latitude: -21.6005, longitude: -48.364 } });
+
+  test('passageiro: usa a localização do aparelho em tempo real', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Linhas de Matão' })).toBeVisible();
+    await page.getByRole('button', { name: 'Usar minha localização' }).click();
+    await expect(page.getByText('Localização em tempo real ativa.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Sua localização em tempo real')).toBeVisible();
+    await checarAxe(page, 'Início com GPS');
+    await page.getByRole('button', { name: 'Parar de usar minha localização' }).click();
+    await expect(page.getByRole('button', { name: 'Usar minha localização' })).toBeVisible();
+  });
 });
 
 test('passageiro: mapa, busca, acessibilidade e histórico sem violações', async ({ page }) => {
@@ -53,7 +71,7 @@ test('passageiro: mapa, busca, acessibilidade e histórico sem violações', asy
   await expect(page.getByRole('group', { name: /Mostrar ou ocultar linhas/ })).toBeVisible();
   await checarAxe(page, 'Mapa');
 
-  await page.goto('/busca?q=102&tipo=todos');
+  await page.goto('/busca?q=azul&tipo=todos');
   await expect(page.locator('.resultado-linha').first()).toBeVisible();
   await checarAxe(page, 'Busca');
 

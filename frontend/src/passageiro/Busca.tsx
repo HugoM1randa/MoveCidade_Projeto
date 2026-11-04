@@ -48,7 +48,7 @@ export function Busca() {
         <div className="campo-com-icone">
           <Search aria-hidden="true" size={20} />
           <input id="campo-busca-2" type="search" value={termo} onChange={(e) => setTermo(e.target.value)}
-            placeholder="Ex.: 102, Matriz, Centro Jardim" autoComplete="off" />
+            placeholder="Ex.: Azul, Santa Rosa, Centro" autoComplete="off" />
         </div>
         <fieldset className="filtro-busca">
           <legend className="sr-only">Buscar por</legend>

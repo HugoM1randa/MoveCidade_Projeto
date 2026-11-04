@@ -1,0 +1,66 @@
+/*
+ * MoveCidade — tema refinado (carregado depois de estilos.css; só sobrescreve e acrescenta).
+ * Cores de linha continuam vindo do backend; a interface usa um verde-petróleo neutro que não
+ * se confunde com o azul, o verde e o vermelho das linhas. Todos os pares texto/fundo ≥ 4,5:1.
+ */
+:root {
+  --fundo: #f3f6fa;
+  --texto: #0f172a;
+  --texto-2: #475569;
+  --borda: #d5dbe5;
+  --destaque: #0e6b78;
+  --destaque-suave: #e2f1f3;
+  --raio: 16px;
+  --sombra: 0 1px 2px rgb(15 23 42 / 0.05), 0 6px 18px rgb(15 23 42 / 0.07);
+}
+:root[data-contraste='alto'] { --destaque: #00424c; --destaque-suave: #ffffff; --borda: #000000; }
+body { -webkit-font-smoothing: antialiased; }
+h1 { letter-spacing: -0.01em; }
+h2 { font-weight: 750; letter-spacing: -0.005em; }
+
+/* botões maiores e mais claros (alvo de toque ≥ 48 px) */
+.botao { min-height: 48px; border-radius: 14px; font-weight: 650; transition: background-color 0.15s, box-shadow 0.15s, transform 0.05s; }
+.botao.primario { background: var(--destaque); box-shadow: 0 2px 6px rgb(14 107 120 / 0.28); }
+.botao.primario:hover { background: #0a5560; }
+.botao:active { transform: translateY(1px); }
+.cartao { border-color: transparent; box-shadow: var(--sombra); }
+:root[data-contraste='alto'] .cartao { border-color: #000; }
+.chip { border-radius: 999px; min-height: 44px; }
+
+/* ---- Linhas de Matão ---- */
+.linhas-matao { margin-bottom: 4px; }
+.grade-linhas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 700px) { .grade-linhas { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.cartao-linha {
+  background: var(--superficie); border-radius: var(--raio); box-shadow: var(--sombra);
+  border-top: 6px solid var(--cor-linha); overflow: hidden;
+}
+:root[data-contraste='alto'] .cartao-linha { border: 2px solid #000; border-top-width: 8px; }
+.cartao-linha h3 { display: flex; align-items: center; gap: 10px; padding: 12px 14px 6px; font-size: 1.15rem; }
+.faixa-cor { width: 14px; height: 14px; border-radius: 50%; background: var(--cor-linha); display: inline-block; }
+.cartao-linha ul { display: flex; flex-direction: column; }
+.itinerario {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 52px;
+  padding: 10px 14px; color: var(--texto); text-decoration: none; font-weight: 600; border-top: 1px solid var(--borda);
+}
+.itinerario:hover { background: var(--destaque-suave); }
+
+/* ---- Localização ---- */
+.selo-simulado.ao-vivo { background: #166534; color: #fff; }
+.aviso-gps { color: var(--aviso); background: var(--aviso-fundo); padding: 8px 10px; border-radius: 10px; }
+
+/* ---- Cabeçalho da linha e quadro de horários ---- */
+.quadro { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.quadro h3 { font-size: 1.1rem; }
+.saidas h4 { font-size: 1rem; margin-bottom: 8px; }
+.horas { display: flex; flex-wrap: wrap; gap: 8px; }
+.horas li {
+  background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px;
+  padding: 6px 10px; font-variant-numeric: tabular-nums; font-weight: 600; min-width: 64px; text-align: center;
+}
+.horas li.proxima { background: var(--destaque); color: #fff; border-color: var(--destaque); }
+
+/* ---- Movimento reduzido ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

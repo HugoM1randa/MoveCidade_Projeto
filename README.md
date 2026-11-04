@@ -7,6 +7,24 @@ App de ônibus urbano com duas partes:
 
 Os dados são **simulados**: cada ônibus é uma "central de telemetria" que anda pelas ruas reais de Matão e envia um pacote a cada 1,5–2 s (lógica do protótipo `script_ramon.py`).
 
+## Linhas reais de Matão (Azul, Verde e Vermelha)
+
+O app agora usa **só as três linhas urbanas reais de Matão** (Viação Paraty), cada uma com dois itinerários:
+
+| Linha | Itinerários | Cor |
+|---|---|---|
+| Azul | Centro ↔ Jd. Santa Rosa · Centro ↔ Bairro Alto | `#1D4ED8` |
+| Verde | Centro ↔ São José · Centro ↔ Jd. Paraíso | `#15803D` |
+| Vermelha | Centro ↔ Bairro Popular · Centro ↔ Monte Carlo | `#DC2626` |
+
+- **Horários**: quadros oficiais (dias úteis, sábado e domingo, saídas do Centro e do bairro), em `backend/movecidade/seed/matao_real.py`. Aparecem na aba *Horários* de cada linha e alimentam a previsão "programado".
+- **Itinerários**: as ruas do itinerário oficial viram as paradas. O Bus2 não publica coordenadas, então `python -m scripts.gerar_ruas_matao` (rodado sozinho pelo `npm run dev` na primeira vez, com internet) localiza as ruas no OpenStreetMap e grava `seed/ruas_matao.json`. **Versione esse arquivo.** Rua não encontrada não vira parada; nenhuma posição é inventada.
+- **Localização em tempo real**: botão *Usar minha localização* (GPS do aparelho, atualizado enquanto o app está aberto). Sem GPS, o pino continua arrastável. A posição não é gravada.
+- **Ônibus no mapa**: continuam **simulados** (a operadora não libera GPS da frota). Para dados reais, envie a telemetria para `POST /api/iot/telemetria`.
+- Fontes: quadros da Prefeitura de Matão / Viação Paraty (os mesmos do Bus2) e https://informatao.com.br/linhas-de-onibus-matao/ (dez/2025). Confira sempre com a operadora.
+
+Para recarregar os dados do zero: apague `backend/dados/` e rode `npm run dev`.
+
 ## Como rodar
 
 Requisitos: **Node 20+** e **Python 3.11+**.

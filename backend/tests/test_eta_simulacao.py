@@ -9,7 +9,7 @@ from movecidade.simulador import CentralTelemetria
 def test_previsao_bate_com_a_chegada_simulada(repo):
     rng = random.Random(7)
     erros = []
-    for linha_id in ("102", "310"):
+    for linha_id in ("azul-santa-rosa", "vermelha-monte-carlo"):
         linha = repo.linha(linha_id)
         ativos = repo.pontos_ativos_da_linha(linha)
         frota = repo.veiculos(linha_id)

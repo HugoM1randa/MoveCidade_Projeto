@@ -8,7 +8,7 @@ Nada é gravado em banco nem em log.
 from __future__ import annotations
 
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import config
@@ -16,6 +16,7 @@ from .dominio import Linha, Ponto
 from .eta import classificar_lotacao, eta_simulacao, para_relogio_usuario, tempo_planejado_simulacao
 from .geo import haversine_m
 from .repositorio import Repositorio
+from .seed import matao_real
 
 FUSO_MATAO = timezone(timedelta(hours=-3))   # America/Sao_Paulo (sem horário de verão desde 2019)
 VELOCIDADE_A_PE_M_MIN = 80.0
@@ -32,6 +33,8 @@ def _sem_acento(texto: str) -> str:
 def destino_da_linha(repo: Repositorio, linha: Linha) -> str:
     if "circular" in linha.nome.lower():
         return "Circular"
+    if " – " in linha.nome:  # "Centro – Santa Rosa" → "Santa Rosa"
+        return linha.nome.split(" – ")[-1].strip()
     ultimo = repo.ponto(linha.pontos[-1]) if linha.pontos else None
     return ultimo.nome if ultimo else linha.nome
 
@@ -44,9 +47,17 @@ def _indice(linha: Linha, ponto_id: str) -> Optional[int]:
 
 
 # ============================================================ tabela programada
+def tipo_de_dia(dia: date) -> str:
+    """Tipo de quadro de horários: dias úteis, sábado ou domingo (feriados seguem o quadro de domingo)."""
+    return {5: "sabado", 6: "domingo"}.get(dia.weekday(), "uteis")
+
+
 def horarios_programados(repo: Repositorio, linha: Linha, ponto_id: str, a_partir: Optional[datetime] = None,
                          quantidade: int = 6) -> List[datetime]:
-    """Partidas a cada `intervalo_min` do primeiro ponto (05h–24h) + tempo planejado até o ponto."""
+    """
+    Próximas passagens pelo ponto segundo o quadro OFICIAL (saídas do Centro + tempo planejado até o ponto).
+    Linhas criadas pelo gestor, sem quadro oficial, usam partidas a cada `intervalo_min` (05h–24h).
+    """
     k = _indice(linha, ponto_id)
     if k is None or linha.comprimento <= 0:
         return []
@@ -54,19 +65,31 @@ def horarios_programados(repo: Repositorio, linha: Linha, ponto_id: str, a_parti
     deslocamento = timedelta(seconds=para_relogio_usuario(
         tempo_planejado_simulacao(linha, ativos, 0.0, linha.s_pontos[k])))
     agora = a_partir or agora_local()
+    oficial = matao_real.quadro(linha.id)
     saida: List[datetime] = []
     dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
-    for dia_offset in (0, 1):
+    for dia_offset in (0, 1, 2):
         base = dia + timedelta(days=dia_offset)
-        minuto = config.HORARIO_INICIO_OPERACAO * 60
-        while minuto < config.HORARIO_FIM_OPERACAO * 60:
+        if oficial:
+            partidas = [int(t[:2]) * 60 + int(t[3:]) for t in oficial["do_centro"][tipo_de_dia(base.date())]]
+        else:
+            partidas = list(range(config.HORARIO_INICIO_OPERACAO * 60, config.HORARIO_FIM_OPERACAO * 60,
+                                  linha.intervalo_min))
+        for minuto in partidas:
             chegada = base + timedelta(minutes=minuto) + deslocamento
             if chegada >= agora:
                 saida.append(chegada)
                 if len(saida) >= quantidade:
                     return saida
-            minuto += linha.intervalo_min
     return saida
+
+
+def quadro_oficial(linha: Linha, hoje: Optional[date] = None) -> Optional[Dict[str, Any]]:
+    """Quadro de horários oficial do itinerário (para a aba Horários), ou None se não houver."""
+    q = matao_real.quadro(linha.id)
+    if not q:
+        return None
+    return {**q, "tipo_dia_hoje": tipo_de_dia(hoje or agora_local().date())}
 
 
 def tabela_horarios(repo: Repositorio, linha: Linha, ponto_id: str) -> List[str]:
@@ -239,6 +262,7 @@ def detalhe_linha(repo: Repositorio, linha: Linha, ponto_id: Optional[str],
         "proximos": proximos,
         "sem_sinal": sem_sinal,
         "horarios": tabela_horarios(repo, linha, ponto.id) if ponto else [],
+        "quadro": quadro_oficial(linha),
         "trajeto": trajeto,
         "intervalo_min": linha.intervalo_min,
     }

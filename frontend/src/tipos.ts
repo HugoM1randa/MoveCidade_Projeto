@@ -91,6 +91,18 @@ export interface ProximoVeiculo {
   no_ponto: boolean;
 }
 
+export type TipoDia = 'uteis' | 'sabado' | 'domingo';
+
+export interface QuadroOficial {
+  destino: string;
+  observacoes: string;
+  fonte: string;
+  referencia: string;
+  tipo_dia_hoje: TipoDia;
+  do_centro: Record<TipoDia, string[]>;
+  para_centro: Record<TipoDia, string[]>;
+}
+
 export interface DetalheLinha {
   linha: Linha;
   ponto: Ponto | null;
@@ -98,6 +110,7 @@ export interface DetalheLinha {
   proximos: ProximoVeiculo[];
   sem_sinal: { veiculo_id: string; acessivel: boolean }[];
   horarios: string[];
+  quadro?: QuadroOficial | null;
   intervalo_min: number;
   trajeto: {
     ordem: number;
